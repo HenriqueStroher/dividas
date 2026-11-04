@@ -63,6 +63,8 @@ src/
 - **Me incluir:** desligado, as pessoas pagam o valor total. Ligado, o usuário entra como mais uma parte, sempre a última, e essa parte (`self_share_cents`) não vira dívida. Sempre vale `total_cents = self_share_cents + soma das partes`.
 - **Valor mínimo:** cada parte precisa de ao menos R$ 0,01, então o total não pode ser menor que o número de partes.
 - **Status:** é por pessoa. `paid_at` vazio = pendente; preenchido = paga. Uma parte paga sai do saldo, mas continua no histórico.
+- **Saldo:** por pessoa, é o líquido das partes pendentes (o que ela me deve menos o que eu devo a ela). Os totais do topo somam esses líquidos: positivos em "me devem", negativos em "eu devo".
+- **Composição do saldo:** lista as partes pendentes, primeiro o que a pessoa me deve e depois o que eu devo, cada grupo por data: "30 Restaurante + 50 Festa + 20 Bebida − 30 Uber = 70 (valor que me deve)".
 - **Edição:** a parte continua paga somente se a pessoa continua na dívida, o valor dela não mudou e o sentido da dívida não mudou. Caso contrário, volta a pendente.
 
 ## Como rodar localmente
@@ -103,6 +105,11 @@ Mudou o banco? Crie uma nova migration em `supabase/migrations/`, nunca edite um
 2. Faça o deploy e atualize a Site URL do Supabase, caso a URL final seja outra.
 
 ## Histórico de alterações
+
+### 2026-11-04: Etapa 3, listagem e saldos
+
+- **O que mudou:** tela principal com resumo e saldo por pessoa; página da pessoa com histórico e composição do saldo ("30 Restaurante + 50 Festa + 20 Bebida − 30 Uber = 70 (valor que me deve)").
+- **Por quê:** o usuário pediu para ver de onde vem o valor de cada saldo. Os totais do topo somam os saldos líquidos para bater com a lista.
 
 ### 2026-11-04: Etapa 2, cadastro de dívidas
 
