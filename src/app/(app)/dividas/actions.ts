@@ -112,6 +112,23 @@ export async function setSharePaid(shareId: string, paid: boolean): Promise<Acti
   return {};
 }
 
+/** Quita tudo o que está pendente com a pessoa. Partes já pagas mantêm a data original do pagamento. */
+export async function settlePerson(personId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("debt_shares")
+    .update({ paid_at: new Date().toISOString() })
+    .eq("person_id", personId)
+    .is("paid_at", null);
+  if (error) {
+    console.error("settlePerson", error);
+    return { error: "Não foi possível atualizar. Tente novamente." };
+  }
+
+  revalidatePath("/", "layout");
+  return {};
+}
+
 /** Marca todas as partes da dívida. Partes já pagas mantêm a data original do pagamento. */
 export async function setDebtPaid(debtId: string, paid: boolean): Promise<ActionResult> {
   const supabase = await createClient();

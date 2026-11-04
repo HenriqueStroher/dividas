@@ -2,18 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   balanceAmounts,
   balanceCaption,
-  balanceFormula,
+  type BalanceItem,
+  balanceNetCents,
   formatShortAmount,
-  type FormulaItem,
   summarizeBalances,
 } from "./balances";
 
-const item = (
-  direction: FormulaItem["direction"],
-  amountCents: number,
-  description: string,
-  occurredOn = "2026-11-04",
-): FormulaItem => ({ direction, amountCents, description, occurredOn });
+const item = (direction: BalanceItem["direction"], amountCents: number, occurredOn = "2026-11-04"): BalanceItem => ({
+  direction,
+  amountCents,
+  occurredOn,
+});
 
 describe("summarizeBalances", () => {
   it("soma os saldos líquidos de cada pessoa", () => {
@@ -41,46 +40,46 @@ describe("formatShortAmount", () => {
   });
 });
 
-describe("balanceFormula", () => {
-  it("reproduz o exemplo pedido: 30 + 50 + 20 − 30 = 70", () => {
-    const result = balanceFormula([
-      item("owed_to_me", 3000, "Restaurante", "2026-11-01"),
-      item("i_owe", 3000, "Uber", "2026-11-02"),
-      item("owed_to_me", 5000, "Festa", "2026-11-03"),
-      item("owed_to_me", 2000, "Bebida", "2026-11-04"),
-    ]);
-    expect(result.expression).toBe("30 Restaurante + 50 Festa + 20 Bebida − 30 Uber");
-    expect(result.netCents).toBe(7000);
+describe("balanceAmounts", () => {
+  it("lista primeiro o que me devem e depois o que eu devo: 30 + 50 + 20 − 30", () => {
+    expect(
+      balanceAmounts([
+        item("owed_to_me", 3000, "2026-11-01"),
+        item("i_owe", 3000, "2026-11-02"),
+        item("owed_to_me", 5000, "2026-11-03"),
+        item("owed_to_me", 2000, "2026-11-04"),
+      ]),
+    ).toBe("30 + 50 + 20 − 30");
   });
 
   it("ordena por data dentro de cada grupo", () => {
-    const { expression } = balanceFormula([
-      item("owed_to_me", 200, "Depois", "2026-11-04"),
-      item("owed_to_me", 100, "Antes", "2026-11-01"),
-    ]);
-    expect(expression).toBe("1 Antes + 2 Depois");
+    expect(balanceAmounts([item("owed_to_me", 200, "2026-11-04"), item("owed_to_me", 100, "2026-11-01")])).toBe(
+      "1 + 2",
+    );
   });
 
   it("começa com o sinal de menos quando só eu devo", () => {
-    const result = balanceFormula([item("i_owe", 3000, "Uber"), item("i_owe", 2000, "Bar")]);
-    expect(result.expression).toBe("− 30 Uber − 20 Bar");
-    expect(result.netCents).toBe(-5000);
+    expect(balanceAmounts([item("i_owe", 3000), item("i_owe", 2000)])).toBe("− 30 − 20");
   });
 
-  it("fica vazia sem itens", () => {
-    expect(balanceFormula([])).toEqual({ expression: "", netCents: 0 });
+  it("mostra centavos e fica vazia sem itens", () => {
+    expect(balanceAmounts([item("owed_to_me", 3333)])).toBe("33,33");
+    expect(balanceAmounts([])).toBe("");
   });
 });
 
-describe("balanceAmounts", () => {
-  it("mostra só os valores, sem as origens", () => {
+describe("balanceNetCents", () => {
+  it("subtrai o que eu devo do que me devem", () => {
     expect(
-      balanceAmounts([
-        item("owed_to_me", 10000, "A", "2026-11-01"),
-        item("i_owe", 3000, "Uber", "2026-11-02"),
-        item("owed_to_me", 3333, "P", "2026-11-03"),
+      balanceNetCents([
+        item("owed_to_me", 3000),
+        item("owed_to_me", 5000),
+        item("owed_to_me", 2000),
+        item("i_owe", 3000),
       ]),
-    ).toBe("100 + 33,33 − 30");
+    ).toBe(7000);
+    expect(balanceNetCents([item("i_owe", 5000)])).toBe(-5000);
+    expect(balanceNetCents([])).toBe(0);
   });
 });
 

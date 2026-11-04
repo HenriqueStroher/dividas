@@ -17,7 +17,7 @@ export function PaidToggle({ shareId, paid }: { shareId: string; paid: boolean }
 
   return (
     <Button type="button" variant={paid ? "ghost" : "outline"} size="sm" disabled={pending} onClick={toggle}>
-      {paid ? "Desfazer pagamento" : "Marcar como paga"}
+      {pending ? "Salvando..." : paid ? "Desfazer pagamento" : "Marcar como paga"}
     </Button>
   );
 }

@@ -57,7 +57,7 @@ export function DebtActions({ debtId, description, shareCount, allPaid }: DebtAc
           disabled={pending}
           onClick={() => run(() => setDebtPaid(debtId, !allPaid))}
         >
-          {allPaid ? "Marcar todas como pendentes" : "Marcar todas como pagas"}
+          {pending ? "Salvando..." : allPaid ? "Marcar todas como pendentes" : "Marcar todas como pagas"}
         </Button>
       )}
 

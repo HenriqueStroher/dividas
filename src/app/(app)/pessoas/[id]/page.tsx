@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { z } from "zod";
+import { SettlePersonButton } from "@/components/debts/settle-person-button";
 import { ShareRow } from "@/components/debts/share-row";
 import { ListSkeleton } from "@/components/layout/list-skeleton";
-import { balanceCaption, balanceFormula, formatShortAmount } from "@/lib/balances";
+import { balanceAmounts, balanceCaption, balanceNetCents, formatShortAmount } from "@/lib/balances";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { getPerson, getShares } from "@/services/supabase/queries";
@@ -19,7 +20,8 @@ async function PersonHistory({ params }: { params: PageProps<"/pessoas/[id]">["p
   if (!person) notFound();
 
   const pending = shares.filter((share) => share.paidAt === null);
-  const { expression, netCents } = balanceFormula(pending);
+  const amounts = balanceAmounts(pending);
+  const netCents = balanceNetCents(pending);
 
   return (
     <>
@@ -35,10 +37,13 @@ async function PersonHistory({ params }: { params: PageProps<"/pessoas/[id]">["p
           {formatCents(Math.abs(netCents))}
         </p>
         <p className="text-sm text-muted-foreground">{balanceCaption(netCents)}</p>
-        {expression && (
-          <p className="border-t pt-2 text-sm">
-            {expression} = {formatShortAmount(Math.abs(netCents))} ({balanceCaption(netCents)})
+        {pending.length > 1 && (
+          <p className="border-t pt-2 text-sm tabular-nums">
+            {amounts} = {formatShortAmount(Math.abs(netCents))} ({balanceCaption(netCents)})
           </p>
+        )}
+        {pending.length > 0 && (
+          <SettlePersonButton personId={person.id} personName={person.name} pendingCount={pending.length} />
         )}
       </section>
 

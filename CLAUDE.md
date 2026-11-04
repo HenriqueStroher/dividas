@@ -65,7 +65,8 @@ src/
 - **Valor mínimo:** cada parte precisa de ao menos R$ 0,01, então o total não pode ser menor que o número de partes.
 - **Status:** é por pessoa. `paid_at` vazio = pendente; preenchido = paga. Uma parte paga sai do saldo, mas continua no histórico.
 - **Saldo:** por pessoa, é o líquido das partes pendentes (o que ela me deve menos o que eu devo a ela). Os totais do topo somam esses líquidos: positivos em "me devem", negativos em "eu devo".
-- **Composição do saldo:** lista as partes pendentes, primeiro o que a pessoa me deve e depois o que eu devo, cada grupo por data. Na tela principal, só os valores: "30 + 50 + 20 − 30". Na página da pessoa, com as origens: "30 Restaurante + 50 Festa + 20 Bebida − 30 Uber = 70 (valor que me deve)".
+- **Composição do saldo:** mostra só os valores das partes pendentes, primeiro o que a pessoa me deve e depois o que eu devo, cada grupo por data. Na tela principal: "30 + 50 + 20 − 30". Na página da pessoa, com o resultado: "30 + 50 + 20 − 30 = 70 (valor que me deve)", e só quando há mais de uma parte pendente. As origens ficam no histórico.
+- **Marcar como paga:** pode ser uma parte, todas as partes de uma dívida (página da dívida) ou tudo o que está pendente com uma pessoa (página da pessoa, nos dois sentidos, com confirmação). Partes já pagas mantêm a data original do pagamento.
 - **Edição:** a parte continua paga somente se a pessoa continua na dívida, o valor dela não mudou e o sentido da dívida não mudou. Caso contrário, volta a pendente.
 
 ## Como rodar localmente
@@ -107,6 +108,12 @@ Projeto atual: **Dividas**, ref `lxkylwyyjumfmyxjpvlu`. Migrations, Redirect URL
 2. Faça o deploy e atualize a Site URL do Supabase, caso a URL final seja outra.
 
 ## Histórico de alterações
+
+### 2026-11-04: quitar tudo com uma pessoa
+
+- **O que mudou:** a página da pessoa mostra a conta só com os valores ("5 + 14 = 19 (valor que me deve)") e ganhou o botão "Marcar todas como pagas", com confirmação.
+- **Por quê:** pedido do usuário. As origens já aparecem no histórico logo abaixo, e quitar item por item era trabalhoso. A confirmação evita quitar tudo por um toque acidental.
+- **Também:** os botões de pagamento mostram "Salvando..." ou "Marcando..." durante a espera, porque nos testes uma resposta levou 8 segundos sem nenhum sinal na tela. A conta fica oculta quando há só uma parte pendente, para não mostrar "10 = 10".
 
 ### 2026-11-04: ajustes pedidos após o primeiro uso
 
