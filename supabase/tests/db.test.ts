@@ -176,15 +176,26 @@ describe("create_debt", () => {
     await as(ALICE, async () => expect(await rows("select * from debts")).toHaveLength(0));
   });
 
-  it("aceita partes iguais arredondadas, mesmo sem somar o total", async () => {
-    const [a, b, c] = await Promise.all(["Paulo", "João", "Maria"].map((name) => addPerson(ALICE, name)));
+  it("aceita partes iguais arredondadas para cima, mesmo passando do total", async () => {
+    const a = await addPerson(ALICE, "Paulo");
+    const b = await addPerson(ALICE, "João");
+    const c = await addPerson(ALICE, "Maria");
     const three = (amount_cents: number) => [a, b, c].map((person_id) => ({ person_id, amount_cents }));
 
-    await expect(createDebt(ALICE, three(3333), { total: 10000 })).resolves.toBeTruthy();
+    await expect(createDebt(ALICE, three(3334), { total: 10000 })).resolves.toBeTruthy();
     await expect(createDebt(ALICE, three(6667), { total: 20000 })).resolves.toBeTruthy();
   });
 
-  it("recusa dar um centavo a mais para alguém", async () => {
+  it("recusa partes arredondadas para baixo", async () => {
+    const a = await addPerson(ALICE, "Paulo");
+    const b = await addPerson(ALICE, "João");
+    const c = await addPerson(ALICE, "Maria");
+    const three = [a, b, c].map((person_id) => ({ person_id, amount_cents: 3333 }));
+
+    await expect(createDebt(ALICE, three, { total: 10000 })).rejects.toThrow(/precisam valer 3334/);
+  });
+
+  it("recusa dar um centavo a mais só para alguém", async () => {
     const paulo = await addPerson(ALICE, "Paulo");
     const joao = await addPerson(ALICE, "João");
     const maria = await addPerson(ALICE, "Maria");
@@ -198,7 +209,7 @@ describe("create_debt", () => {
         ],
         { total: 10000 },
       ),
-    ).rejects.toThrow(/precisam valer 3333/);
+    ).rejects.toThrow(/precisam valer 3334/);
   });
 
   it("recusa parte do próprio usuário diferente das demais", async () => {

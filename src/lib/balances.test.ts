@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   balanceAmounts,
-  balanceCaption,
   type BalanceItem,
   balanceNetCents,
   formatShortAmount,
@@ -80,13 +79,5 @@ describe("balanceNetCents", () => {
     ).toBe(7000);
     expect(balanceNetCents([item("i_owe", 5000)])).toBe(-5000);
     expect(balanceNetCents([])).toBe(0);
-  });
-});
-
-describe("balanceCaption", () => {
-  it("descreve quem deve", () => {
-    expect(balanceCaption(1)).toBe("valor que me deve");
-    expect(balanceCaption(-1)).toBe("valor que eu devo");
-    expect(balanceCaption(0)).toBe("ninguém deve nada");
   });
 });

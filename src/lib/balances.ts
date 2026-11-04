@@ -54,9 +54,3 @@ export function balanceNetCents(items: BalanceItem[]): number {
     0,
   );
 }
-
-export function balanceCaption(netCents: number): string {
-  if (netCents > 0) return "valor que me deve";
-  if (netCents < 0) return "valor que eu devo";
-  return "ninguém deve nada";
-}

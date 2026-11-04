@@ -26,7 +26,7 @@ App web mobile-first, instalável como PWA, para controlar as dívidas que o usu
 - **Escrita atômica:** dívida e partes são gravadas juntas pelas funções `create_debt` e `update_debt`, que rodam como o usuário (`security invoker`).
 - **Divisão em um só lugar:** `src/lib/split.ts` calcula, inclusive para a prévia do formulário. O banco confere se cada parte tem o valor esperado.
 - **Next 16:** `src/proxy.ts` é o antigo middleware. Cache Components está ligado, então leituras de dados por usuário ficam dentro de `<Suspense>`, e `createClient` chama `await connection()`. Não usar `use cache` em dados de usuário.
-- **Páginas ficam vivas ao navegar:** o Next as esconde com `<Activity>` em vez de destruí-las, preservando o estado. Para uma tela voltar zerada, é preciso limpar o estado na saída, como faz `DebtForm`.
+- **Páginas ficam vivas ao navegar:** o Next as esconde com `<Activity>` em vez de destruí-las, preservando o estado. Para uma tela voltar zerada, é preciso limpar o estado na saída, e valores iniciais vindos do servidor não atualizam um formulário já montado. `DebtForm` trata os dois casos.
 - **Links de e-mail:** `/auth/confirm` aceita dois formatos. `code` vem dos templates padrão do Supabase e só cria a sessão no navegador que pediu o e-mail. `token_hash` vem dos templates em `supabase/templates/` e funciona em qualquer navegador, mas o painel só permite editar templates com SMTP próprio. Hoje a produção usa `code`.
 - **PWA sem service worker:** o app é instalável, mas não funciona offline, por decisão de produto (evita saldos desatualizados e conflitos de sincronização).
 
@@ -60,12 +60,12 @@ src/
 
 ## Regras de negócio
 
-- **Divisão:** o valor é dividido igualmente e arredondado para o centavo mais próximo. Todos pagam o mesmo, sem centavo a mais para ninguém: R$ 100 / 3 = 33,33 para cada um; R$ 200 / 3 = 66,67. Por isso, a soma das partes pode diferir do total em alguns centavos, e `total_cents` guarda o valor digitado.
+- **Divisão:** o valor é dividido igualmente. Quando não dá exato, arredonda para cima, e todos pagam o mesmo: R$ 100 / 3 = 33,34 para cada um. Por isso, a soma das partes pode passar do total em alguns centavos, e `total_cents` guarda o valor digitado.
 - **Me incluir:** só existe em "Me devem". Desligado, as pessoas pagam o valor total. Ligado, o usuário conta como mais uma parte, e essa parte (`self_share_cents`) não vira dívida.
 - **Valor mínimo:** cada parte precisa de ao menos R$ 0,01, então o total não pode ser menor que o número de partes.
 - **Status:** é por pessoa. `paid_at` vazio = pendente; preenchido = paga. Uma parte paga sai do saldo, mas continua no histórico.
 - **Saldo:** por pessoa, é o líquido das partes pendentes (o que ela me deve menos o que eu devo a ela). Os totais do topo somam esses líquidos: positivos em "me devem", negativos em "eu devo".
-- **Composição do saldo:** mostra só os valores das partes pendentes, primeiro o que a pessoa me deve e depois o que eu devo, cada grupo por data. Na tela principal: "30 + 50 + 20 − 30". Na página da pessoa, com o resultado: "30 + 50 + 20 − 30 = 70 (valor que me deve)", e só quando há mais de uma parte pendente. As origens ficam no histórico.
+- **Composição do saldo:** mostra só os valores das partes pendentes, primeiro o que a pessoa me deve e depois o que eu devo, cada grupo por data. Na tela principal: "30 + 50 + 20 − 30". Na página da pessoa, com o resultado: "30 + 50 + 20 − 30 = 70", e só quando há mais de uma parte pendente. Se o usuário é quem deve, o resultado leva o sinal: "10 − 30 = − 20". As origens ficam no histórico.
 - **Marcar como paga:** pode ser uma parte, todas as partes de uma dívida (página da dívida) ou tudo o que está pendente com uma pessoa (página da pessoa, nos dois sentidos, com confirmação). Partes já pagas mantêm a data original do pagamento.
 - **Edição:** a parte continua paga somente se a pessoa continua na dívida, o valor dela não mudou e o sentido da dívida não mudou. Caso contrário, volta a pendente.
 
@@ -109,6 +109,13 @@ Projeto atual: **Dividas**, ref `lxkylwyyjumfmyxjpvlu`. Migrations, Redirect URL
 
 ## Histórico de alterações
 
+### 2026-11-04: arredondamento para cima e textos
+
+- **Arredondamento:** quando a divisão não dá exata, todos pagam o valor arredondado para cima (R$ 100 / 3 = 33,34), mesmo que a soma passe do total. A migration `20261104200000` atualiza a checagem no banco. É decisão do usuário e substitui a regra anterior, do centavo mais próximo. Dívidas antigas só mudam se forem editadas.
+- **Textos:** abaixo do saldo da pessoa aparece "Valor total"; a conta perdeu o texto entre parênteses e, sem ele, o resultado leva o sinal quando o usuário é quem deve; os rótulos viraram "Me deve" e "Eu devo".
+- **Bug corrigido:** depois de salvar uma edição, reabrir a edição mostrava o valor anterior, e salvar de novo sobrescreveria o valor certo. Agora `DebtForm` recomeça quando os dados do servidor mudam.
+- **Verificado pelo usuário:** a redefinição de senha funciona.
+
 ### 2026-11-04: quitar tudo com uma pessoa
 
 - **O que mudou:** a página da pessoa mostra a conta só com os valores ("5 + 14 = 19 (valor que me deve)") e ganhou o botão "Marcar todas como pagas", com confirmação.
@@ -140,7 +147,7 @@ Projeto atual: **Dividas**, ref `lxkylwyyjumfmyxjpvlu`. Migrations, Redirect URL
 
 - **O que mudou:** página da dívida com todas as partes; editar, excluir e marcar como paga (por pessoa ou todas da dívida); busca por pessoa, origem e status.
 - **Por quê:** completa as ações pedidas. Os filtros ficam na URL, para sobreviverem ao voltar da página de uma dívida. "Marcar todas" não altera partes já pagas, para preservar a data original do pagamento.
-- **Pendente:** testar no navegador a redefinição de senha e a busca, salvar uma edição e regenerar `src/types/database.ts` (requer `npx supabase login`). Depois, fazer o deploy (etapa 5). O Docker Desktop não concluiu a configuração nesta máquina, então os testes de banco usam PGlite e o desenvolvimento local aponta para o projeto real.
+- **Pendente:** testar no navegador a busca, salvar uma edição e regenerar `src/types/database.ts` (requer `npx supabase login`). Depois, fazer o deploy (etapa 5). O Docker Desktop não concluiu a configuração nesta máquina, então os testes de banco usam PGlite e o desenvolvimento local aponta para o projeto real.
 
 ### 2026-11-04: Etapa 3, listagem e saldos
 

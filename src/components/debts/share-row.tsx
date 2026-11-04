@@ -35,7 +35,7 @@ export function ShareRow({ share, showPerson = false }: ShareRowProps) {
           >
             {formatCents(share.amountCents)}
           </span>
-          <span className="text-xs text-muted-foreground">{iOwe ? "eu devo" : "me deve"}</span>
+          <span className="text-xs text-muted-foreground">{iOwe ? "Eu devo" : "Me deve"}</span>
           {share.amountCents !== share.totalCents && (
             <span className="text-xs text-muted-foreground tabular-nums">de {formatCents(share.totalCents)}</span>
           )}

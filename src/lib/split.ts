@@ -1,7 +1,7 @@
 /**
- * Valor de cada parte em uma divisão igual, arredondado para o centavo mais próximo.
- * Todos pagam o mesmo: 10000 / 3 → 3333; 20000 / 3 → 6667. Por isso, a soma das
- * partes pode diferir do total em alguns centavos. Usa só aritmética de inteiros.
+ * Valor de cada parte em uma divisão igual. Quando não dá exato, arredonda para cima, e
+ * todos pagam o mesmo: 10000 / 3 → 3334. Por isso, a soma das partes pode passar do total
+ * em alguns centavos. Usa só aritmética de inteiros.
  */
 export function equalShareCents(totalCents: number, parts: number): number {
   if (!Number.isSafeInteger(totalCents) || totalCents <= 0) {
@@ -14,7 +14,7 @@ export function equalShareCents(totalCents: number, parts: number): number {
     throw new RangeError("O total não cobre um centavo para cada parte");
   }
 
-  return Math.floor((2 * totalCents + parts) / (2 * parts));
+  return Math.floor((totalCents + parts - 1) / parts);
 }
 
 export type DebtSplit<Id> = {

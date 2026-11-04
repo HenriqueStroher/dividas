@@ -78,7 +78,7 @@ function PersonRow({ balance, amounts }: { balance: PersonBalance; amounts: stri
             {formatCents(Math.abs(netCents))}
           </span>
           {netCents !== 0 && (
-            <span className="text-xs text-muted-foreground">{netCents > 0 ? "me deve" : "eu devo"}</span>
+            <span className="text-xs text-muted-foreground">{netCents > 0 ? "Me deve" : "Eu devo"}</span>
           )}
         </span>
       </Link>

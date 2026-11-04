@@ -5,7 +5,7 @@ import { z } from "zod";
 import { SettlePersonButton } from "@/components/debts/settle-person-button";
 import { ShareRow } from "@/components/debts/share-row";
 import { ListSkeleton } from "@/components/layout/list-skeleton";
-import { balanceAmounts, balanceCaption, balanceNetCents, formatShortAmount } from "@/lib/balances";
+import { balanceAmounts, balanceNetCents, formatShortAmount } from "@/lib/balances";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { getPerson, getShares } from "@/services/supabase/queries";
@@ -36,10 +36,11 @@ async function PersonHistory({ params }: { params: PageProps<"/pessoas/[id]">["p
         >
           {formatCents(Math.abs(netCents))}
         </p>
-        <p className="text-sm text-muted-foreground">{balanceCaption(netCents)}</p>
+        <p className="text-sm text-muted-foreground">Valor total</p>
         {pending.length > 1 && (
           <p className="border-t pt-2 text-sm tabular-nums">
-            {amounts} = {formatShortAmount(Math.abs(netCents))} ({balanceCaption(netCents)})
+            {amounts} = {netCents < 0 && "− "}
+            {formatShortAmount(Math.abs(netCents))}
           </p>
         )}
         {pending.length > 0 && (

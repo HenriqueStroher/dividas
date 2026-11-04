@@ -34,15 +34,16 @@ const DIRECTIONS = [
 ] as const;
 
 /**
- * O Next mantém páginas visitadas escondidas, com o estado intacto (Activity). A limpeza
- * do efeito roda ao sair da página: trocar a key faz o formulário voltar zerado.
+ * O Next mantém páginas visitadas escondidas, com o estado intacto (Activity). O formulário
+ * recomeça em dois casos, pela troca da key: ao sair da página, para voltar zerado, e quando
+ * os dados do servidor mudam. Sem o segundo, a edição reabriria com o valor anterior.
  */
 export function DebtForm(props: DebtFormProps) {
-  const [formKey, setFormKey] = useState(0);
+  const [exitCount, setExitCount] = useState(0);
 
-  useEffect(() => () => setFormKey((key) => key + 1), []);
+  useEffect(() => () => setExitCount((count) => count + 1), []);
 
-  return <DebtFormFields key={formKey} {...props} />;
+  return <DebtFormFields key={`${exitCount}:${JSON.stringify(props.defaultValues)}`} {...props} />;
 }
 
 function DebtFormFields({ people, defaultValues, submitLabel, redirectTo, hint, onSave }: DebtFormProps) {

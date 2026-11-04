@@ -6,21 +6,18 @@ describe("equalShareCents", () => {
     expect(equalShareCents(10000, 2)).toBe(5000);
   });
 
-  it("arredonda dízimas para o centavo mais próximo", () => {
-    expect(equalShareCents(10000, 3)).toBe(3333);
+  it("arredonda para cima quando não dá exato", () => {
+    expect(equalShareCents(10000, 3)).toBe(3334);
     expect(equalShareCents(20000, 3)).toBe(6667);
-  });
-
-  it("arredonda meio centavo para cima", () => {
     expect(equalShareCents(3, 2)).toBe(2);
   });
 
-  it("fica a menos de meio centavo por parte do total", () => {
+  it("cobre o total e passa dele por menos de um centavo por parte", () => {
     for (let total = 1; total <= 500; total++) {
       for (let parts = 1; parts <= Math.min(total, 12); parts++) {
-        const amount = equalShareCents(total, parts);
-        expect(amount).toBeGreaterThanOrEqual(1);
-        expect(Math.abs(amount * parts - total) * 2).toBeLessThanOrEqual(parts);
+        const excess = equalShareCents(total, parts) * parts - total;
+        expect(excess).toBeGreaterThanOrEqual(0);
+        expect(excess).toBeLessThan(parts);
       }
     }
   });
@@ -51,13 +48,13 @@ describe("buildDebtSplit", () => {
     });
   });
 
-  it("em uma dízima, ninguém paga um centavo a mais, nem eu", () => {
+  it("em uma dízima, todos pagam o mesmo valor arredondado para cima, inclusive eu", () => {
     expect(buildDebtSplit(10000, ["paulo", "joao"], true)).toEqual({
       shares: [
-        { id: "paulo", amountCents: 3333 },
-        { id: "joao", amountCents: 3333 },
+        { id: "paulo", amountCents: 3334 },
+        { id: "joao", amountCents: 3334 },
       ],
-      selfShareCents: 3333,
+      selfShareCents: 3334,
     });
   });
 
