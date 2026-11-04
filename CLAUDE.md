@@ -114,7 +114,7 @@ Projeto atual: **Dividas**, ref `lxkylwyyjumfmyxjpvlu`. Migrations, Redirect URL
 - **Arredondamento:** quando a divisão não dá exata, todos pagam o valor arredondado para cima (R$ 100 / 3 = 33,34), mesmo que a soma passe do total. A migration `20261104200000` atualiza a checagem no banco. É decisão do usuário e substitui a regra anterior, do centavo mais próximo. Dívidas antigas só mudam se forem editadas.
 - **Textos:** abaixo do saldo da pessoa aparece "Valor total"; a conta perdeu o texto entre parênteses e, sem ele, o resultado leva o sinal quando o usuário é quem deve; os rótulos viraram "Me deve" e "Eu devo".
 - **Bug corrigido:** depois de salvar uma edição, reabrir a edição mostrava o valor anterior, e salvar de novo sobrescreveria o valor certo. Agora `DebtForm` recomeça quando os dados do servidor mudam.
-- **Verificado pelo usuário:** a redefinição de senha funciona.
+- **Verificado:** o usuário testou a redefinição de senha; no navegador, foram testados a busca com filtros e salvar uma edição.
 
 ### 2026-11-04: quitar tudo com uma pessoa
 
@@ -147,7 +147,7 @@ Projeto atual: **Dividas**, ref `lxkylwyyjumfmyxjpvlu`. Migrations, Redirect URL
 
 - **O que mudou:** página da dívida com todas as partes; editar, excluir e marcar como paga (por pessoa ou todas da dívida); busca por pessoa, origem e status.
 - **Por quê:** completa as ações pedidas. Os filtros ficam na URL, para sobreviverem ao voltar da página de uma dívida. "Marcar todas" não altera partes já pagas, para preservar a data original do pagamento.
-- **Pendente:** testar no navegador a busca, salvar uma edição e regenerar `src/types/database.ts` (requer `npx supabase login`). Depois, fazer o deploy (etapa 5). O Docker Desktop não concluiu a configuração nesta máquina, então os testes de banco usam PGlite e o desenvolvimento local aponta para o projeto real.
+- **Pendente:** regenerar `src/types/database.ts` (requer `npx supabase login`) e fazer o deploy (etapa 5). O Docker Desktop não concluiu a configuração nesta máquina, então os testes de banco usam PGlite e o desenvolvimento local aponta para o projeto real.
 
 ### 2026-11-04: Etapa 3, listagem e saldos
 
