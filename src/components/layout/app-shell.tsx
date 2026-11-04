@@ -1,7 +1,8 @@
 import { LogOutIcon, PlusIcon, SearchIcon, UsersIcon } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { type ReactNode, Suspense } from "react";
 import { signOut } from "@/app/(auth)/actions";
+import { NavLink, NavLinkView } from "@/components/layout/nav-link";
 import { Button } from "@/components/ui/button";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -25,7 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="fixed inset-x-0 bottom-0 z-10 border-t bg-background pb-[env(safe-area-inset-bottom)]"
       >
         <div className="mx-auto grid max-w-md grid-cols-3 items-center">
-          <NavLink href="/" label="Saldos" icon={<UsersIcon className="size-5" />} />
+          <BottomNavLink href="/" label="Saldos" icon={<UsersIcon className="size-5" />} />
           <Link
             href="/dividas/nova"
             aria-label="Nova dívida"
@@ -33,18 +34,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <PlusIcon className="size-6" />
           </Link>
-          <NavLink href="/dividas" label="Buscar" icon={<SearchIcon className="size-5" />} />
+          <BottomNavLink href="/dividas" label="Buscar" icon={<SearchIcon className="size-5" />} />
         </div>
       </nav>
     </div>
   );
 }
 
-function NavLink({ href, label, icon }: { href: string; label: string; icon: ReactNode }) {
+function BottomNavLink(props: { href: string; label: string; icon: ReactNode }) {
   return (
-    <Link href={href} className="flex flex-col items-center gap-1 py-3 text-xs text-muted-foreground">
-      {icon}
-      {label}
-    </Link>
+    <Suspense fallback={<NavLinkView {...props} active={false} />}>
+      <NavLink {...props} />
+    </Suspense>
   );
 }

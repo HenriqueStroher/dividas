@@ -5,6 +5,7 @@ import { z } from "zod";
 import { SettlePersonButton } from "@/components/debts/settle-person-button";
 import { ShareRow } from "@/components/debts/share-row";
 import { ListSkeleton } from "@/components/layout/list-skeleton";
+import { DeletePersonButton } from "@/components/people/delete-person-button";
 import { balanceAmounts, balanceNetCents, formatShortAmount } from "@/lib/balances";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -58,6 +59,13 @@ async function PersonHistory({ params }: { params: PageProps<"/pessoas/[id]">["p
           ))}
         </ul>
       )}
+
+      <DeletePersonButton
+        personId={person.id}
+        personName={person.name}
+        pendingCount={pending.length}
+        historyCount={shares.length}
+      />
     </>
   );
 }

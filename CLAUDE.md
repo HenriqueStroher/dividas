@@ -23,7 +23,7 @@ App web mobile-first, instalável como PWA, para controlar as dívidas que o usu
 
 - **Dinheiro em centavos:** sempre inteiro (`bigint` no banco, `number` no código). Nunca usar float para valores.
 - **Segurança no banco:** o RLS garante o isolamento. As FKs compostas `(person_id, user_id)` e `(debt_id, user_id)` existem porque a checagem de FK ignora o RLS; sem elas, daria para apontar para a pessoa de outro usuário.
-- **Escrita atômica:** dívida e partes são gravadas juntas pelas funções `create_debt` e `update_debt`, que rodam como o usuário (`security invoker`).
+- **Escrita atômica:** dívida e partes são gravadas juntas pelas funções `create_debt` e `update_debt`, e `delete_person` exclui a pessoa e o histórico dela de uma vez. Todas rodam como o usuário (`security invoker`).
 - **Divisão em um só lugar:** `src/lib/split.ts` calcula, inclusive para a prévia do formulário. O banco confere se cada parte tem o valor esperado.
 - **Next 16:** `src/proxy.ts` é o antigo middleware. Cache Components está ligado, então leituras de dados por usuário ficam dentro de `<Suspense>`, e `createClient` chama `await connection()`. Não usar `use cache` em dados de usuário.
 - **Páginas ficam vivas ao navegar:** o Next as esconde com `<Activity>` em vez de destruí-las, preservando o estado. Para uma tela voltar zerada, é preciso limpar o estado na saída, e valores iniciais vindos do servidor não atualizam um formulário já montado. `DebtForm` trata os dois casos.
@@ -44,7 +44,7 @@ src/
     (app)/             rotas autenticadas
     auth/confirm/      destino dos links de e-mail
     manifest.ts        manifesto do PWA
-  components/          ui/ (shadcn), auth/, layout/
+  components/          ui/ (shadcn), auth/, balances/, debts/, layout/, people/
   lib/                 regras puras: money, split, safe-redirect, validations/
   services/supabase/   cliente do servidor e consultas
   types/database.ts    tipos do banco
@@ -68,6 +68,8 @@ src/
 - **Composição do saldo:** mostra só os valores das partes pendentes, primeiro o que a pessoa me deve e depois o que eu devo, cada grupo por data. Na tela principal: "30 + 50 + 20 − 30". Na página da pessoa, com o resultado: "30 + 50 + 20 − 30 = 70", e só quando há mais de uma parte pendente. Se o usuário é quem deve, o resultado leva o sinal: "10 − 30 = − 20". As origens ficam no histórico.
 - **Marcar como paga:** pode ser uma parte, todas as partes de uma dívida (página da dívida) ou tudo o que está pendente com uma pessoa (página da pessoa, nos dois sentidos, com confirmação). Partes já pagas mantêm a data original do pagamento.
 - **Edição:** a parte continua paga somente se a pessoa continua na dívida, o valor dela não mudou e o sentido da dívida não mudou. Caso contrário, volta a pendente.
+- **Criar pessoa:** pelo botão "Nova pessoa" em Saldos ou ao cadastrar uma dívida. O nome é único por usuário.
+- **Excluir pessoa:** na página da pessoa, com confirmação, e só sem nenhuma parte pendente (mesmo com saldo líquido zero). O histórico dela é apagado. Dívida só dela é removida. Dívida dividida continua para as outras pessoas com os mesmos valores, e o total passa a ser a soma do que restou.
 
 ## Como rodar localmente
 
@@ -97,17 +99,35 @@ Mudou o banco? Crie uma nova migration em `supabase/migrations/`, nunca edite um
 
 Projeto atual: **Dividas**, ref `lxkylwyyjumfmyxjpvlu`. Migrations, Redirect URL local e senha mínima de 8 caracteres já estão aplicados.
 
-1. Para novas migrations, rode `npx supabase login`, `npx supabase link --project-ref lxkylwyyjumfmyxjpvlu` e `npx supabase db push`. As quatro primeiras foram aplicadas pelo SQL Editor e registradas em `supabase_migrations.schema_migrations`.
-2. Depois do deploy, em **Authentication > URL Configuration**, troque a Site URL pela URL da Vercel e adicione `<url>/auth/confirm` às Redirect URLs.
+1. Para novas migrations, rode `npx supabase login`, `npx supabase link --project-ref lxkylwyyjumfmyxjpvlu` e `npx supabase db push --remote`. Sem `--remote`, `db push` e `migration list` usam o Supabase local. As quatro primeiras foram aplicadas pelo SQL Editor e registradas em `supabase_migrations.schema_migrations`. As sete migrations atuais estão aplicadas em produção (conferido em 2026-11-04).
+2. Em **Authentication > URL Configuration**, a Site URL é a da Vercel, e as Redirect URLs têm `/auth/confirm` local e de produção. Se a URL da Vercel mudar, atualize os dois campos.
 3. Para outras pessoas usarem o app, configure um SMTP próprio em **Authentication > Emails > SMTP Settings**. O serviço padrão tem limite muito baixo de envio e é destinado a testes.
 4. Com SMTP configurado, copie `supabase/templates/confirmation.html` e `recovery.html` para **Authentication > Emails > Templates**, para que os links funcionem em qualquer navegador.
 
 ### Vercel
 
-1. Importe o repositório e defina `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-2. Faça o deploy e atualize a Site URL do Supabase, caso a URL final seja outra.
+Projeto atual: **dividas**, na conta `henriquestroher`, ligado ao repositório do GitHub. URL de produção: https://dividas-kappa.vercel.app. `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` já estão cadastradas em produção, preview e desenvolvimento.
+
+1. Cada push na `main` gera um deploy de produção. Para fazer um manualmente: `npx vercel deploy --prod`.
+2. No PowerShell, a lista de ambientes de `vercel env add` precisa de aspas: `--environment 'production,preview,development'`. Sem elas, o comando falha com `invalid_environment`.
+3. `vercel link` acrescenta `.vercel` e `.env*` ao `.gitignore`. Desfaça essa mudança: os dois já estão ignorados, e `.env*` ignoraria também um novo `.env.example`.
 
 ## Histórico de alterações
+
+### 2026-11-04: criar e excluir pessoas, e aba atual destacada
+
+- **Pessoas:** Saldos ganhou o botão "Nova pessoa", e a página da pessoa ganhou "Excluir pessoa". A migration `20261104210000` cria `delete_person`, porque a FK `on delete restrict` impedia excluir quem tinha histórico, mesmo já pago. Exigir nada pendente evita apagar dinheiro em aberto por engano.
+- **Barra inferior:** a aba atual ganha fundo escuro no ícone e texto em destaque. Saldos também fica marcada na página da pessoa. A página de uma dívida não marca nenhuma aba, porque pode ser aberta pelas duas. `usePathname` fica em `<Suspense>`, exigido pelo Cache Components nas rotas dinâmicas.
+- **Verificado:** testes, typecheck, lint e build. A migration está aplicada em produção.
+- **Pendente:** testar as telas no navegador com login.
+
+### 2026-11-04: projeto criado na Vercel
+
+- **O que mudou:** projeto `dividas` criado na Vercel e ligado ao GitHub; as duas variáveis do Supabase foram cadastradas nos três ambientes.
+- **Por quê:** a tentativa anterior travou antes de criar o projeto. As variáveis falharam na primeira vez porque o PowerShell separa a lista de ambientes sem aspas.
+- **Deploy:** o usuário fez o primeiro deploy de produção pelo terminal; o app está em https://dividas-kappa.vercel.app.
+- **Supabase:** a Site URL passou a ser a de produção, e `<url>/auth/confirm` entrou nas Redirect URLs, ao lado da URL local.
+- **Pendente:** testar cadastro e login em produção.
 
 ### 2026-11-04: arredondamento para cima e textos
 

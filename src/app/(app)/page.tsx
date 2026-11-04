@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { BalanceSummary } from "@/components/balances/balance-summary";
 import { ListSkeleton } from "@/components/layout/list-skeleton";
+import { AddPerson } from "@/components/people/add-person";
 import { Button } from "@/components/ui/button";
 import { balanceAmounts, summarizeBalances } from "@/lib/balances";
 import { formatCents } from "@/lib/money";
@@ -18,6 +19,9 @@ async function Balances() {
         <Button asChild className="h-11">
           <Link href="/dividas/nova">Cadastrar a primeira</Link>
         </Button>
+        <div className="flex w-full flex-col">
+          <AddPerson />
+        </div>
       </div>
     );
   }
@@ -34,6 +38,7 @@ async function Balances() {
   return (
     <>
       <BalanceSummary {...summarizeBalances(balances)} />
+      <AddPerson />
 
       {open.length > 0 && (
         <ul className="flex flex-col gap-2">

@@ -3,10 +3,12 @@ import { MAX_CENTS } from "@/lib/money";
 
 export const normalizeName = (name: string) => name.trim().toLowerCase();
 
+export const personNameSchema = z.string().trim().min(1, "Informe o nome").max(80, "Use até 80 caracteres");
+
 const personSchema = z.object({
   /** null = pessoa nova, criada ao salvar. */
   id: z.uuid().nullable(),
-  name: z.string().trim().min(1, "Informe o nome").max(80, "Use até 80 caracteres"),
+  name: personNameSchema,
 });
 
 export const debtFormSchema = z

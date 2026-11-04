@@ -166,6 +166,10 @@ export type Database = {
         };
         Returns: undefined;
       };
+      delete_person: {
+        Args: { p_person_id: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       debt_direction: "i_owe" | "owed_to_me";

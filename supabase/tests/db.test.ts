@@ -378,3 +378,111 @@ describe("regras das tabelas", () => {
     await expect(as(ALICE, () => rows("delete from people where id = $1", [paulo]))).rejects.toThrow(/foreign key/);
   });
 });
+
+describe("delete_person", () => {
+  const deletePerson = (user: string | null, personId: string) =>
+    as(user, () => rows("select delete_person($1)", [personId]));
+  const peopleCount = async (user: string) =>
+    as(user, async () => (await rows("select id from people")).length);
+  const debtById = (user: string, debtId: string) =>
+    as(user, async () => {
+      const [debt] = await rows<{ total_cents: string | number; self_share_cents: string | number }>(
+        "select total_cents, self_share_cents from debts where id = $1",
+        [debtId],
+      );
+      return debt;
+    });
+
+  it("exclui uma pessoa sem dívidas", async () => {
+    const paulo = await addPerson(ALICE, "Paulo");
+    await deletePerson(ALICE, paulo);
+    expect(await peopleCount(ALICE)).toBe(0);
+  });
+
+  it("recusa quando há parte pendente e não altera nada", async () => {
+    const paulo = await addPerson(ALICE, "Paulo");
+    const paid = await createDebt(ALICE, [{ person_id: paulo, amount_cents: 1000 }]);
+    await markPaid(ALICE, paid, paulo);
+    const open = await createDebt(ALICE, [{ person_id: paulo, amount_cents: 5000 }]);
+
+    await expect(deletePerson(ALICE, paulo)).rejects.toThrow(/pendentes/);
+
+    expect(await peopleCount(ALICE)).toBe(1);
+    expect(await shareStatus(ALICE, paid)).toHaveLength(1);
+    expect(await shareStatus(ALICE, open)).toHaveLength(1);
+  });
+
+  it("recusa mesmo com saldo líquido zero, se houver pendências nos dois sentidos", async () => {
+    const paulo = await addPerson(ALICE, "Paulo");
+    await createDebt(ALICE, [{ person_id: paulo, amount_cents: 5000 }]);
+    await createDebt(ALICE, [{ person_id: paulo, amount_cents: 5000 }], { direction: "i_owe" });
+
+    await expect(deletePerson(ALICE, paulo)).rejects.toThrow(/pendentes/);
+  });
+
+  it("apaga o histórico pago e a dívida que era só da pessoa", async () => {
+    const paulo = await addPerson(ALICE, "Paulo");
+    const debt = await createDebt(ALICE, [{ person_id: paulo, amount_cents: 5000 }], { self: 5000 });
+    await markPaid(ALICE, debt, paulo);
+
+    await deletePerson(ALICE, paulo);
+
+    expect(await peopleCount(ALICE)).toBe(0);
+    expect(await debtById(ALICE, debt)).toBeUndefined();
+  });
+
+  it("em dívida dividida, mantém as outras pessoas e ajusta o total", async () => {
+    const paulo = await addPerson(ALICE, "Paulo");
+    const joao = await addPerson(ALICE, "João");
+    const maria = await addPerson(ALICE, "Maria");
+    const debt = await createDebt(
+      ALICE,
+      [paulo, joao, maria].map((person_id) => ({ person_id, amount_cents: 3334 })),
+      { total: 10000 },
+    );
+    await markPaid(ALICE, debt, paulo);
+    await markPaid(ALICE, debt, joao);
+
+    await deletePerson(ALICE, paulo);
+
+    const shares = await shareStatus(ALICE, debt);
+    expect(shares.map((s) => s.person_id)).toEqual([joao, maria]);
+    expect(shares.map((s) => Number(s.amount_cents))).toEqual([3334, 3334]);
+    expect(shares[0].paid_at).not.toBeNull();
+    expect(shares[1].paid_at).toBeNull();
+    expect(Number((await debtById(ALICE, debt)).total_cents)).toBe(6668);
+
+    // Editar depois recalcula a partir do novo total e mantém os mesmos valores.
+    await updateDebt(ALICE, debt, [
+      { person_id: joao, amount_cents: 3334 },
+      { person_id: maria, amount_cents: 3334 },
+    ]);
+    expect((await shareStatus(ALICE, debt))[0].paid_at).not.toBeNull();
+  });
+
+  it("mantém a parte do próprio usuário em dívida dividida", async () => {
+    const paulo = await addPerson(ALICE, "Paulo");
+    const joao = await addPerson(ALICE, "João");
+    const debt = await createDebt(
+      ALICE,
+      [paulo, joao].map((person_id) => ({ person_id, amount_cents: 3334 })),
+      { total: 10000, self: 3334 },
+    );
+    await markPaid(ALICE, debt, paulo);
+
+    await deletePerson(ALICE, paulo);
+
+    const updated = await debtById(ALICE, debt);
+    expect(Number(updated.total_cents)).toBe(6668);
+    expect(Number(updated.self_share_cents)).toBe(3334);
+  });
+
+  it("não exclui a pessoa de outro usuário nem funciona sem login", async () => {
+    const paulo = await addPerson(ALICE, "Paulo");
+
+    await expect(deletePerson(BOB, paulo)).rejects.toThrow(/não encontrada/);
+    await expect(deletePerson(null, paulo)).rejects.toThrow(/permission denied/);
+
+    expect(await peopleCount(ALICE)).toBe(1);
+  });
+});
