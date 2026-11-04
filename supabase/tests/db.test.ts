@@ -168,12 +168,59 @@ describe("isolamento entre usuários (RLS)", () => {
 });
 
 describe("create_debt", () => {
-  it("recusa partes que não somam o total e não grava nada", async () => {
+  it("recusa parte diferente do valor esperado e não grava nada", async () => {
     const paulo = await addPerson(ALICE, "Paulo");
     await expect(createDebt(ALICE, [{ person_id: paulo, amount_cents: 5000 }], { total: 9000 })).rejects.toThrow(
-      /soma das partes/,
+      /precisam valer 9000/,
     );
     await as(ALICE, async () => expect(await rows("select * from debts")).toHaveLength(0));
+  });
+
+  it("aceita partes iguais arredondadas, mesmo sem somar o total", async () => {
+    const [a, b, c] = await Promise.all(["Paulo", "João", "Maria"].map((name) => addPerson(ALICE, name)));
+    const three = (amount_cents: number) => [a, b, c].map((person_id) => ({ person_id, amount_cents }));
+
+    await expect(createDebt(ALICE, three(3333), { total: 10000 })).resolves.toBeTruthy();
+    await expect(createDebt(ALICE, three(6667), { total: 20000 })).resolves.toBeTruthy();
+  });
+
+  it("recusa dar um centavo a mais para alguém", async () => {
+    const paulo = await addPerson(ALICE, "Paulo");
+    const joao = await addPerson(ALICE, "João");
+    const maria = await addPerson(ALICE, "Maria");
+    await expect(
+      createDebt(
+        ALICE,
+        [
+          { person_id: paulo, amount_cents: 3334 },
+          { person_id: joao, amount_cents: 3333 },
+          { person_id: maria, amount_cents: 3333 },
+        ],
+        { total: 10000 },
+      ),
+    ).rejects.toThrow(/precisam valer 3333/);
+  });
+
+  it("recusa parte do próprio usuário diferente das demais", async () => {
+    const paulo = await addPerson(ALICE, "Paulo");
+    await expect(
+      createDebt(ALICE, [{ person_id: paulo, amount_cents: 6000 }], { total: 10000, self: 4000 }),
+    ).rejects.toThrow(/precisam valer 5000/);
+  });
+
+  it("recusa total menor que o número de partes", async () => {
+    const paulo = await addPerson(ALICE, "Paulo");
+    const joao = await addPerson(ALICE, "João");
+    await expect(
+      createDebt(
+        ALICE,
+        [
+          { person_id: paulo, amount_cents: 1 },
+          { person_id: joao, amount_cents: 1 },
+        ],
+        { total: 1 },
+      ),
+    ).rejects.toThrow(/não cobre/);
   });
 
   it("desfaz tudo se uma parte falhar", async () => {
@@ -214,15 +261,18 @@ describe("update_debt", () => {
     ]);
     await markPaid(ALICE, debt, paulo);
 
+    // Entra mais uma pessoa e o total cresce na mesma proporção: as partes continuam em 5000.
+    const maria = await addPerson(ALICE, "Maria");
     await updateDebt(ALICE, debt, [
       { person_id: paulo, amount_cents: 5000 },
-      { person_id: joao, amount_cents: 7000 },
+      { person_id: joao, amount_cents: 5000 },
+      { person_id: maria, amount_cents: 5000 },
     ]);
 
-    const [p, j] = await shareStatus(ALICE, debt);
+    const [p, j, m] = await shareStatus(ALICE, debt);
     expect(p.paid_at).not.toBeNull();
     expect(j.paid_at).toBeNull();
-    expect(Number(j.amount_cents)).toBe(7000);
+    expect(m.paid_at).toBeNull();
   });
 
   it("volta a pendente a parte paga cujo valor mudou", async () => {

@@ -28,6 +28,10 @@ export const debtFormSchema = z
       ctx.addIssue({ code: "custom", path: ["people"], message: "Há pessoas repetidas na seleção" });
     }
 
+    if (debt.includeMe && debt.direction === "i_owe") {
+      ctx.addIssue({ code: "custom", path: ["includeMe"], message: "Só é possível se incluir em \"Me devem\"" });
+    }
+
     const parts = debt.people.length + (debt.includeMe ? 1 : 0);
     if (debt.people.length > 0 && debt.totalCents > 0 && debt.totalCents < parts) {
       ctx.addIssue({

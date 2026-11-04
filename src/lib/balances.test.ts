@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { balanceCaption, balanceFormula, formatShortAmount, type FormulaItem, summarizeBalances } from "./balances";
+import {
+  balanceAmounts,
+  balanceCaption,
+  balanceFormula,
+  formatShortAmount,
+  type FormulaItem,
+  summarizeBalances,
+} from "./balances";
 
 const item = (
   direction: FormulaItem["direction"],
@@ -62,6 +69,18 @@ describe("balanceFormula", () => {
 
   it("fica vazia sem itens", () => {
     expect(balanceFormula([])).toEqual({ expression: "", netCents: 0 });
+  });
+});
+
+describe("balanceAmounts", () => {
+  it("mostra só os valores, sem as origens", () => {
+    expect(
+      balanceAmounts([
+        item("owed_to_me", 10000, "A", "2026-11-01"),
+        item("i_owe", 3000, "Uber", "2026-11-02"),
+        item("owed_to_me", 3333, "P", "2026-11-03"),
+      ]),
+    ).toBe("100 + 33,33 − 30");
   });
 });
 

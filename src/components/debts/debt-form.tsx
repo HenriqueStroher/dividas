@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import type { ActionResult } from "@/app/(app)/dividas/actions";
@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { digitsToCents, formatCents } from "@/lib/money";
+import { formatCents } from "@/lib/money";
 import { buildDebtSplit } from "@/lib/split";
 import { cn } from "@/lib/utils";
 import { debtFormSchema, type DebtFormValues } from "@/lib/validations/debt";
 import type { Person } from "@/services/supabase/queries";
+import { CurrencyInput } from "./currency-input";
 import { PeoplePicker } from "./people-picker";
 
 type DebtFormProps = {
@@ -32,12 +33,25 @@ const DIRECTIONS = [
   { value: "i_owe", label: "Eu devo", selected: "border-red-600 bg-red-50 text-red-700" },
 ] as const;
 
-export function DebtForm({ people, defaultValues, submitLabel, redirectTo, hint, onSave }: DebtFormProps) {
+/**
+ * O Next mantém páginas visitadas escondidas, com o estado intacto (Activity). A limpeza
+ * do efeito roda ao sair da página: trocar a key faz o formulário voltar zerado.
+ */
+export function DebtForm(props: DebtFormProps) {
+  const [formKey, setFormKey] = useState(0);
+
+  useEffect(() => () => setFormKey((key) => key + 1), []);
+
+  return <DebtFormFields key={formKey} {...props} />;
+}
+
+function DebtFormFields({ people, defaultValues, submitLabel, redirectTo, hint, onSave }: DebtFormProps) {
   const router = useRouter();
   const {
     control,
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<DebtFormValues>({
     resolver: zodResolver(debtFormSchema),
@@ -76,14 +90,12 @@ export function DebtForm({ people, defaultValues, submitLabel, redirectTo, hint,
           control={control}
           name="totalCents"
           render={({ field }) => (
-            <Input
+            <CurrencyInput
               id="totalCents"
-              inputMode="numeric"
-              autoComplete="off"
               autoFocus={defaultValues.totalCents === 0}
               aria-invalid={!!errors.totalCents}
-              value={formatCents(field.value)}
-              onChange={(event) => field.onChange(digitsToCents(event.target.value))}
+              cents={field.value}
+              onCentsChange={field.onChange}
               onBlur={field.onBlur}
               ref={field.ref}
               className="h-14 text-center text-2xl font-semibold tabular-nums md:text-2xl"
@@ -105,7 +117,10 @@ export function DebtForm({ people, defaultValues, submitLabel, redirectTo, hint,
                   key={option.value}
                   type="button"
                   aria-pressed={field.value === option.value}
-                  onClick={() => field.onChange(option.value)}
+                  onClick={() => {
+                    field.onChange(option.value);
+                    if (option.value === "i_owe") setValue("includeMe", false);
+                  }}
                   className={cn(
                     "h-12 rounded-lg border text-sm font-medium transition-colors",
                     field.value === option.value ? option.selected : "text-muted-foreground",
@@ -129,21 +144,25 @@ export function DebtForm({ people, defaultValues, submitLabel, redirectTo, hint,
         <FieldError message={errors.people?.message} />
       </div>
 
-      <Controller
-        control={control}
-        name="includeMe"
-        render={({ field }) => (
-          <Label htmlFor="includeMe" className="flex items-center justify-between gap-4 rounded-lg border p-3">
-            <span className="flex flex-col gap-1">
-              <span>Me incluir na divisão</span>
-              <span className="text-xs font-normal text-muted-foreground">
-                {includeMeHint(field.value, direction)}
+      {direction === "owed_to_me" && (
+        <Controller
+          control={control}
+          name="includeMe"
+          render={({ field }) => (
+            <Label htmlFor="includeMe" className="flex items-center justify-between gap-4 rounded-lg border p-3">
+              <span className="flex flex-col gap-1">
+                <span>Me incluir na divisão</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {field.value
+                    ? "Você entra como mais uma parte, e essa parte não vira dívida."
+                    : "As pessoas te pagam o valor total."}
+                </span>
               </span>
-            </span>
-            <Switch id="includeMe" checked={field.value} onCheckedChange={field.onChange} />
-          </Label>
-        )}
-      />
+              <Switch id="includeMe" checked={field.value} onCheckedChange={field.onChange} />
+            </Label>
+          )}
+        />
+      )}
 
       {preview && (
         <section aria-label="Prévia da divisão" className="flex flex-col gap-1 rounded-lg bg-muted p-3 text-sm">
@@ -194,11 +213,6 @@ export function DebtForm({ people, defaultValues, submitLabel, redirectTo, hint,
       </Button>
     </form>
   );
-}
-
-function includeMeHint(includeMe: boolean, direction: DebtFormValues["direction"]) {
-  if (includeMe) return "Você entra como mais uma parte, e essa parte não vira dívida.";
-  return direction === "owed_to_me" ? "As pessoas te pagam o valor total." : "Você paga o valor total às pessoas.";
 }
 
 function FieldError({ message }: { message?: string }) {

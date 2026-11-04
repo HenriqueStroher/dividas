@@ -1,6 +1,7 @@
 "use server";
 
 import type { AuthError } from "@supabase/supabase-js";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   forgotPasswordSchema,
@@ -27,6 +28,14 @@ function authErrorMessage(error: AuthError): string {
   return (error.code && AUTH_ERRORS[error.code]) || "Não foi possível concluir. Tente novamente.";
 }
 
+/** URL para onde o link do e-mail volta. Usa a origem atual para valer em local e em produção. */
+async function emailRedirectUrl(next: string): Promise<string> {
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+  const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
+  return `${protocol}://${host}/auth/confirm?next=${encodeURIComponent(next)}`;
+}
+
 export async function signIn(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const parsed = signInSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -43,7 +52,10 @@ export async function signUp(_: AuthFormState, formData: FormData): Promise<Auth
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp(parsed.data);
+  const { data, error } = await supabase.auth.signUp({
+    ...parsed.data,
+    options: { emailRedirectTo: await emailRedirectUrl("/") },
+  });
   if (error) return { error: authErrorMessage(error) };
 
   // Sem sessão significa que a confirmação de e-mail está ativa.
@@ -56,7 +68,9 @@ export async function requestPasswordReset(_: AuthFormState, formData: FormData)
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email);
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: await emailRedirectUrl("/redefinir-senha"),
+  });
   if (error?.code === "over_email_send_rate_limit") return { error: authErrorMessage(error) };
 
   // A resposta é a mesma exista ou não a conta, para não revelar quem está cadastrado.

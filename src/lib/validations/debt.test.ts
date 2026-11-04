@@ -42,6 +42,11 @@ describe("debtFormSchema", () => {
     ).toBe("Há pessoas repetidas na seleção");
   });
 
+  it("só permite me incluir quando me devem", () => {
+    expect(firstError({ direction: "owed_to_me", includeMe: true })).toBeNull();
+    expect(firstError({ direction: "i_owe", includeMe: true })).toBe('Só é possível se incluir em "Me devem"');
+  });
+
   it("recusa valor que deixaria alguém com R$ 0,00, contando o próprio usuário", () => {
     const message = "O valor não cobre ao menos R$ 0,01 para cada parte";
     expect(firstError({ totalCents: 1, includeMe: true })).toBe(message);

@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { BalanceSummary } from "@/components/balances/balance-summary";
 import { ListSkeleton } from "@/components/layout/list-skeleton";
 import { Button } from "@/components/ui/button";
-import { balanceFormula, summarizeBalances } from "@/lib/balances";
+import { balanceAmounts, summarizeBalances } from "@/lib/balances";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { getBalances, getShares, type PersonBalance } from "@/services/supabase/queries";
@@ -29,8 +29,7 @@ async function Balances() {
     .filter((balance) => balance.netCents === 0)
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
-  const formulaFor = (personId: string) =>
-    balanceFormula(pending.filter((share) => share.personId === personId)).expression;
+  const amountsFor = (personId: string) => balanceAmounts(pending.filter((share) => share.personId === personId));
 
   return (
     <>
@@ -39,7 +38,7 @@ async function Balances() {
       {open.length > 0 && (
         <ul className="flex flex-col gap-2">
           {open.map((balance) => (
-            <PersonRow key={balance.personId} balance={balance} formula={formulaFor(balance.personId)} />
+            <PersonRow key={balance.personId} balance={balance} amounts={amountsFor(balance.personId)} />
           ))}
         </ul>
       )}
@@ -49,7 +48,7 @@ async function Balances() {
           <h2 className="text-sm font-medium text-muted-foreground">Em dia</h2>
           <ul className="flex flex-col gap-2">
             {settled.map((balance) => (
-              <PersonRow key={balance.personId} balance={balance} formula={formulaFor(balance.personId)} />
+              <PersonRow key={balance.personId} balance={balance} amounts={amountsFor(balance.personId)} />
             ))}
           </ul>
         </section>
@@ -58,14 +57,14 @@ async function Balances() {
   );
 }
 
-function PersonRow({ balance, formula }: { balance: PersonBalance; formula: string }) {
+function PersonRow({ balance, amounts }: { balance: PersonBalance; amounts: string }) {
   const { netCents } = balance;
   return (
     <li>
       <Link href={`/pessoas/${balance.personId}`} className="flex items-center justify-between gap-4 rounded-lg border p-3">
         <span className="flex min-w-0 flex-col gap-1">
           <span className="truncate font-medium">{balance.name}</span>
-          {formula && <span className="line-clamp-2 text-xs text-muted-foreground">{formula}</span>}
+          {amounts && <span className="line-clamp-2 text-xs text-muted-foreground tabular-nums">{amounts}</span>}
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
           <span

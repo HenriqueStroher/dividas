@@ -24,9 +24,10 @@ App web mobile-first, instalável como PWA, para controlar as dívidas que o usu
 - **Dinheiro em centavos:** sempre inteiro (`bigint` no banco, `number` no código). Nunca usar float para valores.
 - **Segurança no banco:** o RLS garante o isolamento. As FKs compostas `(person_id, user_id)` e `(debt_id, user_id)` existem porque a checagem de FK ignora o RLS; sem elas, daria para apontar para a pessoa de outro usuário.
 - **Escrita atômica:** dívida e partes são gravadas juntas pelas funções `create_debt` e `update_debt`, que rodam como o usuário (`security invoker`).
-- **Divisão em um só lugar:** `src/lib/split.ts` calcula, inclusive para a prévia do formulário. O banco só confere se a soma bate.
-- **Next 16:** `src/proxy.ts` é o antigo middleware. Cache Components está ligado, então leituras de dados por usuário ficam dentro de `<Suspense>`. Não usar `use cache` em dados de usuário.
-- **Links de e-mail:** usam `token_hash` em `/auth/confirm` (e não PKCE) para funcionar se o link abrir em outro navegador ou no celular. Depende dos templates em `supabase/templates/`.
+- **Divisão em um só lugar:** `src/lib/split.ts` calcula, inclusive para a prévia do formulário. O banco confere se cada parte tem o valor esperado.
+- **Next 16:** `src/proxy.ts` é o antigo middleware. Cache Components está ligado, então leituras de dados por usuário ficam dentro de `<Suspense>`, e `createClient` chama `await connection()`. Não usar `use cache` em dados de usuário.
+- **Páginas ficam vivas ao navegar:** o Next as esconde com `<Activity>` em vez de destruí-las, preservando o estado. Para uma tela voltar zerada, é preciso limpar o estado na saída, como faz `DebtForm`.
+- **Links de e-mail:** `/auth/confirm` aceita dois formatos. `code` vem dos templates padrão do Supabase e só cria a sessão no navegador que pediu o e-mail. `token_hash` vem dos templates em `supabase/templates/` e funciona em qualquer navegador, mas o painel só permite editar templates com SMTP próprio. Hoje a produção usa `code`.
 - **PWA sem service worker:** o app é instalável, mas não funciona offline, por decisão de produto (evita saldos desatualizados e conflitos de sincronização).
 
 ## Estrutura de pastas
@@ -59,12 +60,12 @@ src/
 
 ## Regras de negócio
 
-- **Divisão:** o valor é dividido igualmente entre as pessoas selecionadas. Os centavos que sobram vão para as primeiras: R$ 100 / 3 = 33,34 / 33,33 / 33,33.
-- **Me incluir:** desligado, as pessoas pagam o valor total. Ligado, o usuário entra como mais uma parte, sempre a última, e essa parte (`self_share_cents`) não vira dívida. Sempre vale `total_cents = self_share_cents + soma das partes`.
+- **Divisão:** o valor é dividido igualmente e arredondado para o centavo mais próximo. Todos pagam o mesmo, sem centavo a mais para ninguém: R$ 100 / 3 = 33,33 para cada um; R$ 200 / 3 = 66,67. Por isso, a soma das partes pode diferir do total em alguns centavos, e `total_cents` guarda o valor digitado.
+- **Me incluir:** só existe em "Me devem". Desligado, as pessoas pagam o valor total. Ligado, o usuário conta como mais uma parte, e essa parte (`self_share_cents`) não vira dívida.
 - **Valor mínimo:** cada parte precisa de ao menos R$ 0,01, então o total não pode ser menor que o número de partes.
 - **Status:** é por pessoa. `paid_at` vazio = pendente; preenchido = paga. Uma parte paga sai do saldo, mas continua no histórico.
 - **Saldo:** por pessoa, é o líquido das partes pendentes (o que ela me deve menos o que eu devo a ela). Os totais do topo somam esses líquidos: positivos em "me devem", negativos em "eu devo".
-- **Composição do saldo:** lista as partes pendentes, primeiro o que a pessoa me deve e depois o que eu devo, cada grupo por data: "30 Restaurante + 50 Festa + 20 Bebida − 30 Uber = 70 (valor que me deve)".
+- **Composição do saldo:** lista as partes pendentes, primeiro o que a pessoa me deve e depois o que eu devo, cada grupo por data. Na tela principal, só os valores: "30 + 50 + 20 − 30". Na página da pessoa, com as origens: "30 Restaurante + 50 Festa + 20 Bebida − 30 Uber = 70 (valor que me deve)".
 - **Edição:** a parte continua paga somente se a pessoa continua na dívida, o valor dela não mudou e o sentido da dívida não mudou. Caso contrário, volta a pendente.
 
 ## Como rodar localmente
@@ -93,11 +94,12 @@ Mudou o banco? Crie uma nova migration em `supabase/migrations/`, nunca edite um
 
 ### Supabase
 
-1. Crie o projeto em supabase.com.
-2. Rode `npx supabase login`, `npx supabase link --project-ref <ref>` e `npx supabase db push`.
-3. Em **Authentication > URL Configuration**, defina a Site URL com a URL da Vercel e adicione `<url>/auth/confirm` às Redirect URLs.
-4. Em **Authentication > Email Templates**, copie o conteúdo de `supabase/templates/confirmation.html` e `recovery.html`. Sem isso, os links de e-mail não apontam para `/auth/confirm`.
-5. Configure um SMTP próprio em **Authentication > SMTP Settings**. O serviço padrão do Supabase envia pouquíssimos e-mails por hora.
+Projeto atual: **Dividas**, ref `lxkylwyyjumfmyxjpvlu`. Migrations, Redirect URL local e senha mínima de 8 caracteres já estão aplicados.
+
+1. Para novas migrations, rode `npx supabase login`, `npx supabase link --project-ref lxkylwyyjumfmyxjpvlu` e `npx supabase db push`. As quatro primeiras foram aplicadas pelo SQL Editor e registradas em `supabase_migrations.schema_migrations`.
+2. Depois do deploy, em **Authentication > URL Configuration**, troque a Site URL pela URL da Vercel e adicione `<url>/auth/confirm` às Redirect URLs.
+3. Para outras pessoas usarem o app, configure um SMTP próprio em **Authentication > Emails > SMTP Settings**. O serviço padrão tem limite muito baixo de envio e é destinado a testes.
+4. Com SMTP configurado, copie `supabase/templates/confirmation.html` e `recovery.html` para **Authentication > Emails > Templates**, para que os links funcionem em qualquer navegador.
 
 ### Vercel
 
@@ -105,6 +107,22 @@ Mudou o banco? Crie uma nova migration em `supabase/migrations/`, nunca edite um
 2. Faça o deploy e atualize a Site URL do Supabase, caso a URL final seja outra.
 
 ## Histórico de alterações
+
+### 2026-11-04: ajustes pedidos após o primeiro uso
+
+- **Formulário zerado:** ao sair da página, o formulário volta ao estado inicial. O Next preservava os dados da última dívida.
+- **Seleção de pessoas:** a lista só aparece ao tocar no campo "Buscar ou criar pessoa". Fora dele, aparecem só as selecionadas, que podem ser removidas com um toque.
+- **Me incluir:** só aparece em "Me devem", porque não faz sentido em "Eu devo".
+- **Tela principal:** mostra só os valores abaixo do nome; as origens ficam na página da pessoa.
+- **Arredondamento:** a sobra de centavos deixou de ir para as primeiras pessoas. Agora todos pagam o mesmo valor arredondado, e a migration `20261104180000` atualiza a checagem no banco. Dívidas antigas só mudam se forem editadas.
+- **Campo de valor:** o cursor agora fica sempre no fim (`CurrencyInput`). Um toque no meio do campo fazia R$ 100 virar R$ 100.000. Bug encontrado nos testes no navegador.
+- **Erro de desenvolvimento:** `createClient` passou a chamar `await connection()`, o que elimina o aviso "unstable value `Date.now()`".
+
+### 2026-11-04: projeto Supabase configurado e links de e-mail padrão
+
+- **O que mudou:** migrations aplicadas no projeto Dividas; Redirect URL local e senha mínima de 8 caracteres configuradas; `/auth/confirm` passou a aceitar `code`, além de `token_hash`; cadastro e recuperação de senha agora informam a URL de retorno; `.env.local` criado.
+- **Por quê:** o Supabase só permite editar templates de e-mail com SMTP próprio. Sem essa mudança, os links dos e-mails padrão não funcionariam. Limitação atual: redefinir a senha exige abrir o link no mesmo navegador em que foi pedido.
+- **Verificado:** no projeto real, visitantes sem login recebem "permission denied" em tabelas, views e funções.
 
 ### 2026-11-04: shadcn em devDependencies
 
@@ -115,7 +133,7 @@ Mudou o banco? Crie uma nova migration em `supabase/migrations/`, nunca edite um
 
 - **O que mudou:** página da dívida com todas as partes; editar, excluir e marcar como paga (por pessoa ou todas da dívida); busca por pessoa, origem e status.
 - **Por quê:** completa as ações pedidas. Os filtros ficam na URL, para sobreviverem ao voltar da página de uma dívida. "Marcar todas" não altera partes já pagas, para preservar a data original do pagamento.
-- **Pendente:** validar no navegador, contra um Supabase real, os fluxos autenticados (login, e-mails, cadastro, edição, busca) e regenerar `src/types/database.ts` com `npm run db:types`. Até aqui, o banco foi testado no PGlite, porque o Docker Desktop não concluiu a configuração nesta máquina. Depois, fazer o deploy (etapa 5).
+- **Pendente:** testar no navegador a redefinição de senha e a busca, salvar uma edição e regenerar `src/types/database.ts` (requer `npx supabase login`). Depois, fazer o deploy (etapa 5). O Docker Desktop não concluiu a configuração nesta máquina, então os testes de banco usam PGlite e o desenvolvimento local aponta para o projeto real.
 
 ### 2026-11-04: Etapa 3, listagem e saldos
 

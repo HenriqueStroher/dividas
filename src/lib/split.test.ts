@@ -1,34 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { buildDebtSplit, splitCents } from "./split";
+import { buildDebtSplit, equalShareCents } from "./split";
 
-describe("splitCents", () => {
+describe("equalShareCents", () => {
   it("divide igualmente quando o valor é exato", () => {
-    expect(splitCents(10000, 2)).toEqual([5000, 5000]);
+    expect(equalShareCents(10000, 2)).toBe(5000);
   });
 
-  it("dá os centavos que sobram às primeiras partes", () => {
-    expect(splitCents(10000, 3)).toEqual([3334, 3333, 3333]);
-    expect(splitCents(10001, 3)).toEqual([3334, 3334, 3333]);
+  it("arredonda dízimas para o centavo mais próximo", () => {
+    expect(equalShareCents(10000, 3)).toBe(3333);
+    expect(equalShareCents(20000, 3)).toBe(6667);
   });
 
-  it("sempre soma o total", () => {
+  it("arredonda meio centavo para cima", () => {
+    expect(equalShareCents(3, 2)).toBe(2);
+  });
+
+  it("fica a menos de meio centavo por parte do total", () => {
     for (let total = 1; total <= 500; total++) {
       for (let parts = 1; parts <= Math.min(total, 12); parts++) {
-        const amounts = splitCents(total, parts);
-        expect(amounts.reduce((a, b) => a + b, 0)).toBe(total);
-        expect(Math.max(...amounts) - Math.min(...amounts)).toBeLessThanOrEqual(1);
+        const amount = equalShareCents(total, parts);
+        expect(amount).toBeGreaterThanOrEqual(1);
+        expect(Math.abs(amount * parts - total) * 2).toBeLessThanOrEqual(parts);
       }
     }
   });
 
   it("recusa divisões que deixariam alguém com R$ 0,00", () => {
-    expect(() => splitCents(2, 3)).toThrow(RangeError);
+    expect(() => equalShareCents(2, 3)).toThrow(RangeError);
   });
 
   it("recusa entradas inválidas", () => {
-    expect(() => splitCents(0, 1)).toThrow(RangeError);
-    expect(() => splitCents(100, 0)).toThrow(RangeError);
-    expect(() => splitCents(10.5, 2)).toThrow(RangeError);
+    expect(() => equalShareCents(0, 1)).toThrow(RangeError);
+    expect(() => equalShareCents(100, 0)).toThrow(RangeError);
+    expect(() => equalShareCents(10.5, 2)).toThrow(RangeError);
   });
 });
 
@@ -47,10 +51,10 @@ describe("buildDebtSplit", () => {
     });
   });
 
-  it("os centavos que sobram vão para as pessoas antes de mim", () => {
+  it("em uma dízima, ninguém paga um centavo a mais, nem eu", () => {
     expect(buildDebtSplit(10000, ["paulo", "joao"], true)).toEqual({
       shares: [
-        { id: "paulo", amountCents: 3334 },
+        { id: "paulo", amountCents: 3333 },
         { id: "joao", amountCents: 3333 },
       ],
       selfShareCents: 3333,

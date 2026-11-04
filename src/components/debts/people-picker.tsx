@@ -1,9 +1,8 @@
 "use client";
 
-import { CheckIcon, PlusIcon } from "lucide-react";
-import { type KeyboardEvent, useState } from "react";
+import { PlusIcon, XIcon } from "lucide-react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import { type DebtFormValues, normalizeName } from "@/lib/validations/debt";
 import type { Person } from "@/services/supabase/queries";
 
@@ -15,37 +14,39 @@ type PeoplePickerProps = {
   onChange: (value: SelectedPerson[]) => void;
 };
 
+/** A lista de pessoas só aparece com o campo de busca ativo; fora dele, só as selecionadas. */
 export function PeoplePicker({ people, value, onChange }: PeoplePickerProps) {
   const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
   const query = normalizeName(search);
+
+  useEffect(() => {
+    function closeOnOutsidePress(event: PointerEvent) {
+      if (!container.current?.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePress);
+  }, []);
 
   const isSelected = (name: string) => value.some((person) => normalizeName(person.name) === normalizeName(name));
 
-  function toggle(person: SelectedPerson) {
-    onChange(
-      isSelected(person.name)
-        ? value.filter((item) => normalizeName(item.name) !== normalizeName(person.name))
-        : [...value, person],
-    );
+  function select(person: SelectedPerson) {
+    if (!isSelected(person.name)) onChange([...value, person]);
+    setSearch("");
   }
 
-  // Pessoas novas já selecionadas continuam visíveis, para poder desmarcar.
-  const newPeople = value.filter((person) => !person.id);
-  const options: SelectedPerson[] = [...people, ...newPeople].filter((person) =>
-    normalizeName(person.name).includes(query),
-  );
+  function remove(person: SelectedPerson) {
+    onChange(value.filter((item) => normalizeName(item.name) !== normalizeName(person.name)));
+  }
 
-  const exactMatch = [...people, ...newPeople].find((person) => normalizeName(person.name) === query);
+  const options = people.filter((person) => !isSelected(person.name) && normalizeName(person.name).includes(query));
+  const exactMatch = [...people, ...value].find((person) => normalizeName(person.name) === query);
   const canCreate = query !== "" && !exactMatch;
 
   function submitSearch() {
     if (query === "") return;
-    if (exactMatch) {
-      if (!isSelected(exactMatch.name)) toggle(exactMatch);
-    } else {
-      toggle({ id: null, name: search.trim() });
-    }
-    setSearch("");
+    select(exactMatch ?? { id: null, name: search.trim() });
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -53,55 +54,76 @@ export function PeoplePicker({ people, value, onChange }: PeoplePickerProps) {
       event.preventDefault();
       submitSearch();
     }
+    if (event.key === "Escape") setOpen(false);
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={container} className="flex flex-col gap-3">
       <Input
         id="people-search"
         placeholder="Buscar ou criar pessoa"
         autoComplete="off"
         maxLength={80}
         value={search}
-        onChange={(event) => setSearch(event.target.value)}
+        onChange={(event) => {
+          setSearch(event.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
         onKeyDown={handleKeyDown}
         className="h-11"
       />
 
-      <div className="flex flex-wrap gap-2">
-        {options.map((person) => {
-          const selected = isSelected(person.name);
-          return (
+      {open && (
+        <div className="flex flex-wrap gap-2 rounded-lg border p-2">
+          {options.map((person) => (
             <button
-              key={person.id ?? person.name}
+              key={person.id}
               type="button"
-              aria-pressed={selected}
-              onClick={() => {
-                toggle(person);
-                setSearch("");
-              }}
-              className={cn(
-                "flex h-10 max-w-full items-center gap-1 rounded-full border px-4 text-sm transition-colors",
-                selected && "border-primary bg-primary text-primary-foreground",
-              )}
+              onClick={() => select(person)}
+              className="flex h-10 max-w-full items-center rounded-full border px-4 text-sm"
             >
-              {selected && <CheckIcon className="size-4 shrink-0" />}
               <span className="truncate">{person.name}</span>
             </button>
-          );
-        })}
+          ))}
 
-        {canCreate && (
-          <button
-            type="button"
-            onClick={submitSearch}
-            className="flex h-10 max-w-full items-center gap-1 rounded-full border border-dashed px-4 text-sm"
-          >
-            <PlusIcon className="size-4 shrink-0" />
-            <span className="truncate">Criar &ldquo;{search.trim()}&rdquo;</span>
-          </button>
-        )}
-      </div>
+          {canCreate && (
+            <button
+              type="button"
+              onClick={submitSearch}
+              className="flex h-10 max-w-full items-center gap-1 rounded-full border border-dashed px-4 text-sm"
+            >
+              <PlusIcon className="size-4 shrink-0" />
+              <span className="truncate">Criar &ldquo;{search.trim()}&rdquo;</span>
+            </button>
+          )}
+
+          {options.length === 0 && !canCreate && (
+            <p className="px-2 py-2 text-sm text-muted-foreground">
+              {query === "" ? "Digite um nome para criar uma pessoa." : "Essa pessoa já está selecionada."}
+            </p>
+          )}
+        </div>
+      )}
+
+      {value.length > 0 && (
+        <ul aria-label="Pessoas selecionadas" className="flex flex-wrap gap-2">
+          {value.map((person) => (
+            <li key={person.id ?? person.name} className="max-w-full">
+              <button
+                type="button"
+                aria-label={`Remover ${person.name}`}
+                onClick={() => remove(person)}
+                className="flex h-10 max-w-full items-center gap-1 rounded-full bg-primary pr-3 pl-4 text-sm text-primary-foreground"
+              >
+                <span className="truncate">{person.name}</span>
+                <XIcon className="size-4 shrink-0" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

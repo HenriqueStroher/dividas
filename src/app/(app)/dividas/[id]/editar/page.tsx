@@ -33,7 +33,7 @@ async function EditDebtForm({ params }: { params: PageProps<"/dividas/[id]/edita
         totalCents: debt.totalCents,
         direction: debt.direction,
         people: debt.shares.map((share) => ({ id: share.personId, name: share.personName })),
-        includeMe: debt.selfShareCents > 0,
+        includeMe: debt.direction === "owed_to_me" && debt.selfShareCents > 0,
         description: debt.description,
         occurredOn: debt.occurredOn,
       }}

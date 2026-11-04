@@ -1,8 +1,9 @@
 /**
- * Divide um total em partes iguais. Os centavos que sobram vão, um a um,
- * para as primeiras partes: 10000 / 3 → [3334, 3333, 3333].
+ * Valor de cada parte em uma divisão igual, arredondado para o centavo mais próximo.
+ * Todos pagam o mesmo: 10000 / 3 → 3333; 20000 / 3 → 6667. Por isso, a soma das
+ * partes pode diferir do total em alguns centavos. Usa só aritmética de inteiros.
  */
-export function splitCents(totalCents: number, parts: number): number[] {
+export function equalShareCents(totalCents: number, parts: number): number {
   if (!Number.isSafeInteger(totalCents) || totalCents <= 0) {
     throw new RangeError("O total precisa ser um inteiro positivo de centavos");
   }
@@ -13,9 +14,7 @@ export function splitCents(totalCents: number, parts: number): number[] {
     throw new RangeError("O total não cobre um centavo para cada parte");
   }
 
-  const base = Math.floor(totalCents / parts);
-  const remainder = totalCents % parts;
-  return Array.from({ length: parts }, (_, i) => (i < remainder ? base + 1 : base));
+  return Math.floor((2 * totalCents + parts) / (2 * parts));
 }
 
 export type DebtSplit<Id> = {
@@ -24,18 +23,14 @@ export type DebtSplit<Id> = {
   selfShareCents: number;
 };
 
-/**
- * Monta a divisão de uma dívida. O usuário, quando incluído, fica por último:
- * os centavos que sobram vão primeiro para as pessoas selecionadas.
- */
 export function buildDebtSplit<Id>(
   totalCents: number,
   personIds: readonly Id[],
   includeMe: boolean,
 ): DebtSplit<Id> {
-  const amounts = splitCents(totalCents, personIds.length + (includeMe ? 1 : 0));
+  const amountCents = equalShareCents(totalCents, personIds.length + (includeMe ? 1 : 0));
   return {
-    shares: personIds.map((id, i) => ({ id, amountCents: amounts[i] })),
-    selfShareCents: includeMe ? amounts[personIds.length] : 0,
+    shares: personIds.map((id) => ({ id, amountCents })),
+    selfShareCents: includeMe ? amountCents : 0,
   };
 }

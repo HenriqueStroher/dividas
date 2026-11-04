@@ -29,24 +29,30 @@ export function formatShortAmount(cents: number): string {
   return cents % 100 === 0 ? whole.format(cents / 100) : decimal.format(cents / 100);
 }
 
-/**
- * Composição do saldo de uma pessoa: "30 Restaurante + 50 Festa − 30 Uber".
- * O que ela me deve vem antes do que eu devo a ela; dentro de cada grupo, por data.
- */
-export function balanceFormula(items: FormulaItem[]): { expression: string; netCents: number } {
+/** O que a pessoa me deve vem antes do que eu devo a ela; dentro de cada grupo, por data. */
+function formatTerms(items: FormulaItem[], termOf: (item: FormulaItem) => string): string {
   const byDate = (a: FormulaItem, b: FormulaItem) => a.occurredOn.localeCompare(b.occurredOn);
   const ordered = [
     ...items.filter((item) => item.direction === "owed_to_me").sort(byDate),
     ...items.filter((item) => item.direction === "i_owe").sort(byDate),
   ];
 
-  const expression = ordered
+  return ordered
     .map((item, i) => {
-      const term = `${formatShortAmount(item.amountCents)} ${item.description}`;
-      if (item.direction === "i_owe") return `− ${term}`;
-      return i === 0 ? term : `+ ${term}`;
+      if (item.direction === "i_owe") return `− ${termOf(item)}`;
+      return i === 0 ? termOf(item) : `+ ${termOf(item)}`;
     })
     .join(" ");
+}
+
+/** Versão curta para a tela principal, só com os valores: "30 + 50 − 30". */
+export function balanceAmounts(items: FormulaItem[]): string {
+  return formatTerms(items, (item) => formatShortAmount(item.amountCents));
+}
+
+/** Composição do saldo de uma pessoa, com as origens: "30 Restaurante + 50 Festa − 30 Uber". */
+export function balanceFormula(items: FormulaItem[]): { expression: string; netCents: number } {
+  const expression = formatTerms(items, (item) => `${formatShortAmount(item.amountCents)} ${item.description}`);
 
   const netCents = items.reduce(
     (sum, item) => sum + (item.direction === "owed_to_me" ? item.amountCents : -item.amountCents),
