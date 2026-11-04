@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { buildDebtSplit } from "@/lib/split";
 import { debtFormSchema, type DebtFormValues, type DebtInput, normalizeName } from "@/lib/validations/debt";
 import { createClient } from "@/services/supabase/server";
@@ -95,7 +94,7 @@ export async function deleteDebt(debtId: string): Promise<ActionResult> {
   }
 
   revalidatePath("/", "layout");
-  redirect("/");
+  return {};
 }
 
 export async function setSharePaid(shareId: string, paid: boolean): Promise<ActionResult> {

@@ -106,6 +106,12 @@ Mudou o banco? Crie uma nova migration em `supabase/migrations/`, nunca edite um
 
 ## Histórico de alterações
 
+### 2026-11-04: Etapa 4, ações, busca e filtros
+
+- **O que mudou:** página da dívida com todas as partes; editar, excluir e marcar como paga (por pessoa ou todas da dívida); busca por pessoa, origem e status.
+- **Por quê:** completa as ações pedidas. Os filtros ficam na URL, para sobreviverem ao voltar da página de uma dívida. "Marcar todas" não altera partes já pagas, para preservar a data original do pagamento.
+- **Pendente:** validar no navegador, contra um Supabase real, os fluxos autenticados (login, e-mails, cadastro, edição, busca) e regenerar `src/types/database.ts` com `npm run db:types`. Até aqui, o banco foi testado no PGlite, porque o Docker Desktop não concluiu a configuração nesta máquina. Depois, fazer o deploy (etapa 5).
+
 ### 2026-11-04: Etapa 3, listagem e saldos
 
 - **O que mudou:** tela principal com resumo e saldo por pessoa; página da pessoa com histórico e composição do saldo ("30 Restaurante + 50 Festa + 20 Bebida − 30 Uber = 70 (valor que me deve)").
