@@ -106,6 +106,11 @@ Mudou o banco? Crie uma nova migration em `supabase/migrations/`, nunca edite um
 
 ## Histórico de alterações
 
+### 2026-11-04: shadcn em devDependencies
+
+- **O que mudou:** o pacote `shadcn` passou de `dependencies` para `devDependencies`.
+- **Por quê:** ele só fornece a CLI e um CSS usado no build. Com a mudança, `npm audit --omit=dev` não aponta vulnerabilidades; os avisos restantes são de ferramentas de desenvolvimento.
+
 ### 2026-11-04: Etapa 4, ações, busca e filtros
 
 - **O que mudou:** página da dívida com todas as partes; editar, excluir e marcar como paga (por pessoa ou todas da dívida); busca por pessoa, origem e status.
