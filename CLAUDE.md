@@ -104,6 +104,11 @@ Mudou o banco? Crie uma nova migration em `supabase/migrations/`, nunca edite um
 
 ## Histórico de alterações
 
+### 2026-11-04: Etapa 2, cadastro de dívidas
+
+- **O que mudou:** formulário de nova dívida com valor, tipo, seleção e criação de pessoas, "me incluir", origem e data; prévia da divisão; Server Actions e consultas.
+- **Por quê:** é o fluxo central do app. Pessoas novas só são gravadas ao salvar, para não deixar cadastros soltos se o usuário desistir. O campo de valor funciona como caixa eletrônico (só dígitos), o que elimina a ambiguidade entre vírgula e ponto. A data padrão usa o fuso do Brasil, porque o servidor roda em UTC.
+
 ### 2026-11-04: Etapa 1, banco e autenticação
 
 - **O que mudou:** projeto Next.js criado; migrations de tabelas, RLS, funções e views; login, cadastro, recuperação de senha e rotas protegidas; manifesto e ícones do PWA; testes de banco no PGlite; este arquivo.
