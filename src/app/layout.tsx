@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import type { ReactNode } from "react";
+import { RecoveryHashRedirect } from "@/components/auth/recovery-hash-redirect";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="pt-BR" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         {children}
+        <RecoveryHashRedirect />
         <Toaster theme="light" position="top-center" />
       </body>
     </html>

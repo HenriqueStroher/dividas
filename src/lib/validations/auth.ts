@@ -13,3 +13,8 @@ export const signUpSchema = z.object({ email, password: newPassword });
 export const forgotPasswordSchema = z.object({ email });
 
 export const resetPasswordSchema = z.object({ password: newPassword });
+
+export const recoveryTokensSchema = z.object({
+  accessToken: z.string().min(1),
+  refreshToken: z.string().min(1),
+});

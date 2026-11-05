@@ -1,5 +1,6 @@
 "use client";
 
+import { MailCheck } from "lucide-react";
 import { useActionState } from "react";
 import type { AuthFormState } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,16 @@ type AuthFormProps = {
 
 export function AuthForm({ action, fields, submitLabel }: AuthFormProps) {
   const [state, formAction, pending] = useActionState(action, {});
+
+  // Some com o formulário depois do envio: o limite é baixo, e um segundo toque gastaria outro e-mail.
+  if (state.message) {
+    return (
+      <div role="status" className="flex gap-3 rounded-lg border bg-muted p-4 text-sm">
+        <MailCheck aria-hidden className="size-5 shrink-0" />
+        <p>{state.message}</p>
+      </div>
+    );
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -42,12 +53,6 @@ export function AuthForm({ action, fields, submitLabel }: AuthFormProps) {
           {state.error}
         </p>
       )}
-      {state.message && (
-        <p role="status" className="text-sm text-muted-foreground">
-          {state.message}
-        </p>
-      )}
-
       <Button type="submit" disabled={pending} className="h-11">
         {pending ? "Aguarde..." : submitLabel}
       </Button>

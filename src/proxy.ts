@@ -1,10 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_ONLY_PATHS = ["/login", "/cadastro", "/esqueci-senha"];
+const GUEST_ONLY_PATHS = ["/login", "/cadastro"];
+const PUBLIC_PATHS = [...GUEST_ONLY_PATHS, "/esqueci-senha"];
 
 /** Renova a sessão do Supabase e redireciona conforme o usuário está logado ou não. */
 export async function proxy(request: NextRequest) {
+  // Links de e-mail. Se a renovação de uma sessão antiga falhasse aqui, o Supabase apagaria também o
+  // cookie do PKCE, e /auth/confirm não conseguiria mais validar o link.
+  if (request.nextUrl.pathname.startsWith("/auth/")) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -30,13 +37,11 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isPublicOnly = PUBLIC_ONLY_PATHS.includes(pathname);
-  const isAuthCallback = pathname.startsWith("/auth/");
 
-  if (!user && !isPublicOnly && !isAuthCallback) {
+  if (!user && !PUBLIC_PATHS.includes(pathname)) {
     return redirectKeepingCookies(request, response, "/login");
   }
-  if (user && isPublicOnly) {
+  if (user && GUEST_ONLY_PATHS.includes(pathname)) {
     return redirectKeepingCookies(request, response, "/");
   }
 

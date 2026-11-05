@@ -27,7 +27,9 @@ App web mobile-first, instalável como PWA, para controlar as dívidas que o usu
 - **Divisão em um só lugar:** `src/lib/split.ts` calcula, inclusive para a prévia do formulário. O banco confere se cada parte tem o valor esperado.
 - **Next 16:** `src/proxy.ts` é o antigo middleware. Cache Components está ligado, então leituras de dados por usuário ficam dentro de `<Suspense>`, e `createClient` chama `await connection()`. Não usar `use cache` em dados de usuário.
 - **Páginas ficam vivas ao navegar:** o Next as esconde com `<Activity>` em vez de destruí-las, preservando o estado. Para uma tela voltar zerada, é preciso limpar o estado na saída, e valores iniciais vindos do servidor não atualizam um formulário já montado. `DebtForm` trata os dois casos.
-- **Links de e-mail:** `/auth/confirm` aceita dois formatos. `code` vem dos templates padrão do Supabase e só cria a sessão no navegador que pediu o e-mail. `token_hash` vem dos templates em `supabase/templates/` e funciona em qualquer navegador, mas o painel só permite editar templates com SMTP próprio. Hoje a produção usa `code`.
+- **Links de confirmação de cadastro:** `/auth/confirm` aceita dois formatos. `code` vem dos templates padrão do Supabase e só cria a sessão no navegador que pediu o e-mail. `token_hash` vem dos templates em `supabase/templates/` e funciona em qualquer navegador, mas o painel só permite editar templates com SMTP próprio. Hoje a produção usa `code`.
+- **Links de redefinição de senha:** usam o fluxo implícito (`createPasswordRecoveryClient`), porque o PKCE do cliente com cookies só funciona no navegador que fez o pedido. O link volta para `/auth/recuperar` com os tokens depois do `#`; só o navegador os vê, e a página os envia a `startRecoverySession` e os apaga da URL. `RecoveryHashRedirect`, no layout raiz, encaminha para lá os links que caem em outra página, como os enviados pelo painel do Supabase.
+- **`/auth/*` fora da sessão do proxy:** o proxy não chama `getUser` nessas rotas. Se a renovação de uma sessão antiga falha, o Supabase apaga também os cookies do PKCE, e o link deixaria de funcionar.
 - **PWA sem service worker:** o app é instalável, mas não funciona offline, por decisão de produto (evita saldos desatualizados e conflitos de sincronização).
 
 ## Estrutura de pastas
@@ -40,12 +42,12 @@ supabase/
 src/
   proxy.ts             renova a sessão e protege as rotas
   app/
-    (auth)/            login, cadastro, esqueci-senha, redefinir-senha, actions
+    (auth)/            login, cadastro, esqueci-senha, redefinir-senha, auth/recuperar, actions
     (app)/             rotas autenticadas
-    auth/confirm/      destino dos links de e-mail
+    auth/confirm/      destino dos links de confirmação de cadastro
     manifest.ts        manifesto do PWA
   components/          ui/ (shadcn), auth/, balances/, debts/, layout/, people/
-  lib/                 regras puras: money, split, safe-redirect, validations/
+  lib/                 regras puras: money, split, safe-redirect, recovery-link, validations/
   services/supabase/   cliente do servidor e consultas
   types/database.ts    tipos do banco
 ```
@@ -100,9 +102,9 @@ Mudou o banco? Crie uma nova migration em `supabase/migrations/`, nunca edite um
 Projeto atual: **Dividas**, ref `lxkylwyyjumfmyxjpvlu`. Migrations, Redirect URL local e senha mínima de 8 caracteres já estão aplicados.
 
 1. Para novas migrations, rode `npx supabase login`, `npx supabase link --project-ref lxkylwyyjumfmyxjpvlu` e `npx supabase db push --remote`. Sem `--remote`, `db push` e `migration list` usam o Supabase local. As quatro primeiras foram aplicadas pelo SQL Editor e registradas em `supabase_migrations.schema_migrations`. As sete migrations atuais estão aplicadas em produção (conferido em 2026-11-04).
-2. Em **Authentication > URL Configuration**, a Site URL é a da Vercel, e as Redirect URLs têm `/auth/confirm` local e de produção. Se a URL da Vercel mudar, atualize os dois campos.
-3. Para outras pessoas usarem o app, configure um SMTP próprio em **Authentication > Emails > SMTP Settings**. O serviço padrão tem limite muito baixo de envio e é destinado a testes.
-4. Com SMTP configurado, copie `supabase/templates/confirmation.html` e `recovery.html` para **Authentication > Emails > Templates**, para que os links funcionem em qualquer navegador.
+2. Em **Authentication > URL Configuration**, a Site URL é a da Vercel, e as Redirect URLs têm `/auth/confirm` e `/auth/recuperar`, locais e de produção. Se a URL da Vercel mudar, atualize os dois campos. As Redirect URLs sem curinga comparam a URL inteira, inclusive a query string, e uma URL fora da lista cai na Site URL.
+3. Para outras pessoas usarem o app, configure um SMTP próprio em **Authentication > Emails > SMTP Settings**. O serviço padrão envia só 2 e-mails por hora no projeto inteiro, somando todos os usuários, e é destinado a testes. O campo fica bloqueado sem SMTP próprio.
+4. Com SMTP configurado, copie `supabase/templates/confirmation.html` para **Authentication > Emails > Templates**, para que a confirmação de cadastro funcione em qualquer navegador. O `recovery.html` é opcional: a redefinição de senha já funciona assim.
 
 ### Vercel
 
@@ -113,6 +115,16 @@ Projeto atual: **dividas**, na conta `henriquestroher`, ligado ao repositório d
 3. `vercel link` acrescenta `.vercel` e `.env*` ao `.gitignore`. Desfaça essa mudança: os dois já estão ignorados, e `.env*` ignoraria também um novo `.env.example`.
 
 ## Histórico de alterações
+
+### 2026-11-05: redefinição de senha em qualquer navegador
+
+- **Link:** o e-mail agora usa o fluxo implícito e volta para a nova página `/auth/recuperar`, que abre a sessão e leva à nova senha. Antes, em PKCE, o link falhava sem nenhum `/token?grant_type=pkce` nos logs quando faltava o cookie do PKCE: ao abrir em outro navegador ou quando o proxy o apagava ao renovar uma sessão antiga. O erro também sumia para quem já estava logado, porque o proxy mandava de `/login?erro=...` para `/`.
+- **Link enviado pelo painel do Supabase:** volta para a Site URL com os tokens depois do `#`, e o login os ignorava. `RecoveryHashRedirect` passou a encaminhá-lo. Link usado ou vencido mostra o motivo e o botão "Pedir um novo link".
+- **Mensagens:** ao enviar, o formulário dá lugar a um aviso em destaque, porque o texto cinza passava despercebido e um segundo toque gastaria outro e-mail. Agora qualquer erro do Supabase aparece, não só o de limite, e o texto do limite diz para aguardar até 1 hora.
+- **Proxy:** não renova a sessão em `/auth/*`, e `/esqueci-senha` também abre para quem está logado.
+- **Supabase:** `/auth/recuperar` entrou nas Redirect URLs, local e de produção.
+- **Verificado:** testes, typecheck, lint e build. No app local com o Supabase real: pedido, e-mail, link até a tela de nova senha e link repetido. Não testados: salvar a nova senha (para não trocar a senha real) e abrir o link em outro navegador.
+- **Pendente:** deploy e teste em produção. O limite de 2 e-mails por hora continua até configurar SMTP próprio.
 
 ### 2026-11-04: criar e excluir pessoas, e aba atual destacada
 

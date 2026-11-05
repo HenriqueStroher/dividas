@@ -3,13 +3,15 @@
 import type { AuthError } from "@supabase/supabase-js";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { RECOVERY_LINK_PATH, type RecoveryTokens } from "@/lib/recovery-link";
 import {
   forgotPasswordSchema,
+  recoveryTokensSchema,
   resetPasswordSchema,
   signInSchema,
   signUpSchema,
 } from "@/lib/validations/auth";
-import { createClient } from "@/services/supabase/server";
+import { createClient, createPasswordRecoveryClient } from "@/services/supabase/server";
 
 export type AuthFormState = { error?: string; message?: string };
 
@@ -20,7 +22,7 @@ const AUTH_ERRORS: Record<string, string> = {
   email_exists: "Já existe uma conta com este e-mail.",
   weak_password: "Essa senha é muito fraca. Escolha uma senha mais forte.",
   same_password: "A nova senha precisa ser diferente da atual.",
-  over_email_send_rate_limit: "Muitos e-mails enviados. Aguarde alguns minutos e tente de novo.",
+  over_email_send_rate_limit: "Limite de e-mails atingido. Aguarde até 1 hora e tente de novo.",
   over_request_rate_limit: "Muitas tentativas. Aguarde alguns minutos e tente de novo.",
 };
 
@@ -29,11 +31,11 @@ function authErrorMessage(error: AuthError): string {
 }
 
 /** URL para onde o link do e-mail volta. Usa a origem atual para valer em local e em produção. */
-async function emailRedirectUrl(next: string): Promise<string> {
+async function emailRedirectUrl(path: string): Promise<string> {
   const requestHeaders = await headers();
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
-  return `${protocol}://${host}/auth/confirm?next=${encodeURIComponent(next)}`;
+  return `${protocol}://${host}${path}`;
 }
 
 export async function signIn(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -54,7 +56,7 @@ export async function signUp(_: AuthFormState, formData: FormData): Promise<Auth
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     ...parsed.data,
-    options: { emailRedirectTo: await emailRedirectUrl("/") },
+    options: { emailRedirectTo: await emailRedirectUrl("/auth/confirm?next=%2F") },
   });
   if (error) return { error: authErrorMessage(error) };
 
@@ -67,14 +69,29 @@ export async function requestPasswordReset(_: AuthFormState, formData: FormData)
   const parsed = forgotPasswordSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: await emailRedirectUrl("/redefinir-senha"),
+  const { error } = await createPasswordRecoveryClient().auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: await emailRedirectUrl(RECOVERY_LINK_PATH),
   });
-  if (error?.code === "over_email_send_rate_limit") return { error: authErrorMessage(error) };
+  if (error) return { error: authErrorMessage(error) };
 
-  // A resposta é a mesma exista ou não a conta, para não revelar quem está cadastrado.
-  return { message: "Se houver uma conta com este e-mail, enviaremos um link para redefinir a senha." };
+  // O Supabase responde igual exista ou não a conta, e o texto não revela quem está cadastrado.
+  return {
+    message:
+      "Pedido enviado. Se houver uma conta com este e-mail, o link chega em instantes. Veja também o spam e use sempre o e-mail mais recente.",
+  };
+}
+
+/** Abre a sessão a partir dos tokens do link de redefinição, gravando-a nos cookies. */
+export async function startRecoverySession(tokens: RecoveryTokens): Promise<boolean> {
+  const parsed = recoveryTokensSchema.safeParse(tokens);
+  if (!parsed.success) return false;
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.setSession({
+    access_token: parsed.data.accessToken,
+    refresh_token: parsed.data.refreshToken,
+  });
+  return !error;
 }
 
 export async function resetPassword(_: AuthFormState, formData: FormData): Promise<AuthFormState> {

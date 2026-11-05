@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { connection } from "next/server";
 import type { Database } from "@/types/database";
@@ -27,5 +28,18 @@ export async function createClient() {
         },
       },
     },
+  );
+}
+
+/**
+ * Cliente sem sessão para pedir o e-mail de redefinição de senha. O cliente com cookies sempre usa
+ * PKCE, e aí o link só abre no navegador que fez o pedido. No fluxo implícito, o link traz os tokens
+ * e funciona em qualquer navegador, inclusive no navegador interno do app de e-mail.
+ */
+export function createPasswordRecoveryClient() {
+  return createSupabaseClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    { auth: { flowType: "implicit", persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } },
   );
 }

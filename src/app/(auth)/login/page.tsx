@@ -11,8 +11,7 @@ async function LinkError({ searchParams }: { searchParams: PageProps<"/login">["
   if (erro !== "link-invalido") return null;
   return (
     <p role="alert" className="text-sm text-destructive">
-      Não foi possível concluir pelo link. Se estava confirmando o cadastro, tente entrar. Para redefinir a senha, peça
-      um novo link e abra-o no mesmo navegador.
+      Não foi possível concluir pelo link. Se estava confirmando o cadastro, tente entrar.
     </p>
   );
 }
